@@ -5,11 +5,14 @@
 
 #define MAX_CMP_SIZE 16
 #define MAX_FILE_NAME_SIZE 256
+#define INITIAL_LINE_SIZE 100
 
 struct file_struct {
 	struct file_struct *next;
 	struct file_struct *parent;
 	struct file_struct *children;
+	struct acl_entry *aclHead;
+	struct acl_entry *aclTail;
 	char cmpName[MAX_CMP_SIZE + 1];	
 };
 
@@ -34,6 +37,14 @@ struct user_group_list {
 	struct group_struct *group;
 	struct user_group_list *next;
 };
+
+struct acl_entry {
+	struct acl_entry *next;
+	struct group_struct *group;
+	struct user_struct *user;
+	int readPermission;
+	int writePermission;
+}
 
 
 static struct file_struct *root;
@@ -79,6 +90,8 @@ int addChild(struct file_struct *parent, struct file_struct *child) {
 struct file_struct *createFile(char *cmpName, struct file_struct *parent) {
 	struct file_struct *file = malloc(sizeof(struct file_struct));
 
+	printf("Creating file %s\n", cmpName);
+
 	if (!file) {
 		printAndExit(NULL);
 	}
@@ -86,6 +99,9 @@ struct file_struct *createFile(char *cmpName, struct file_struct *parent) {
 	file->parent = parent;
 	file->next = NULL;
 	file->children = NULL;
+	file->aclHead = NULL;
+	file->aclTail = NULL;
+
 	strncpy(file->cmpName, cmpName, MAX_CMP_SIZE);
 	file->cmpName[MAX_CMP_SIZE] = '\0';
 
@@ -334,8 +350,12 @@ int addUserAndGroup(char *username, char *groupname) {
 int parseUserDefinitionLine(char *line) {
 	char *userStart = line;
 	char *groupStart;
+	char *filePathStart;
+	char *fileName;
 	char c;
 	int len = 0;
+
+	printf("Line = %s\n", line);
 
 	//@todo *.group, user.*, *.*
 
@@ -355,6 +375,8 @@ int parseUserDefinitionLine(char *line) {
 	}
 
 	char *username = strndup(userStart, len);
+	struct user_struct *possibleUser = findUserByUsername(username);
+
 	int noFile = 0;
 
 	len = 0;
@@ -363,16 +385,10 @@ int parseUserDefinitionLine(char *line) {
 
 	// Get group name
 	while((c = *line) != ' ') {
-		if (c == '\n'){
+		if (c == '\0'){
 			noFile = 1;
 			break;
 		}
-
-		if (c == '\0') {
-			// @todo
-			//printAndExit("Unexpected end of input");
-			break;
-		}		
 
 		len++;
 		line++;
@@ -381,12 +397,40 @@ int parseUserDefinitionLine(char *line) {
 
 	char *groupname = strndup(groupStart, len);
 
+	addUserAndGroup(username, groupname);
+
 
 	if (noFile) {
+		if (possibleUser == NULL) {
+			printAndExit("The first instance of a user must have a file name");
+		}
 
+		return 0;
 	}
 
-	addUserAndGroup(username, groupname);
+	
+	len = 0;
+	line++;
+	filePathStart = line;	
+
+	// Get file
+	while((c = *line) != '\0') {		
+		len++;
+		line++;
+	}
+
+	if (len) {
+		if (possibleUser != NULL) {
+			printAndExit("Only the first instance of the user can contain a file");		
+		}
+
+		fileName = strndup(filePathStart, len);
+		addFileByPath(fileName);		
+	} else {
+		if (possibleUser == NULL) {			
+			printAndExit("The first instance of a user must have a file name");	
+		}		
+	}
 
 	return 0;
 }
@@ -402,22 +446,63 @@ int initFs() {
 	return 0;
 }
 
-int main(int argc, char *argv[]) {
-	if (initFs()) {
-		return 1;
+char *getLine() {
+	int len = INITIAL_LINE_SIZE;
+	int index = 0;
+	char *line = malloc(len);	
+	char *returnLine;
+	char c;
+
+	if (line == NULL) {
+		printAndExit(NULL);
 	}
 
-	parseUserDefinitionLine("nicolas.mesa");
-	parseUserDefinitionLine("nicolas.mesa");
-	parseUserDefinitionLine("nicolas.mesaaassa");
-	parseUserDefinitionLine("nicolas.caasd");
-	parseUserDefinitionLine("sdfas.mesa");
-	parseUserDefinitionLine("ff.f");
-	parseUserDefinitionLine("ff.mesa");
-	parseUserDefinitionLine("ff.mesaaassa");
-	parseUserDefinitionLine("nicolas.mesa");
+	while ((c = getchar()) != '\0' && c != '\n') {
+		line[index] = c;
+		index++;
 
-	printf("%s\n", root->cmpName);
+		if (index > len - 1) {			
+			len *= 2;
+			line = realloc(line, len);
+		}
+	}
+
+	line[index] = '\0';
+
+	returnLine = strndup(line, index);
+
+	if (returnLine == NULL) {
+		printAndExit(NULL);
+	}
+
+	free(line);
+
+	return returnLine;
+}
+
+int parseUserDefinitionSection() {
+	char *line;
+
+	while (1) {
+		line = getLine();
+
+		if (strcmp(line, ".") == 0) {
+			free(line);
+			break;
+		}
+
+		parseUserDefinitionLine(line);
+
+		free(line);
+	}
+
+	return 0;
+}
+
+int main(int argc, char *argv[]) {
+	initFs();
+
+	parseUserDefinitionSection();
 
 	return 0;
 }
