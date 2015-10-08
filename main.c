@@ -137,7 +137,6 @@ struct file_struct *addFileByPath(char *pathStart) {
 
 		cmpName[cmpLength] = '\0';
 
-		printf("Component name(%s), last(%d)\n", cmpName, last);
 
 		struct file_struct *temp = findFileInListByName(currentFile->children, cmpName);
 
@@ -147,10 +146,8 @@ struct file_struct *addFileByPath(char *pathStart) {
 
 		if (temp) {			
 			currentFile = temp;			
-			printf("File found: %s\n", currentFile->cmpName);
 		} else {			
 			currentFile = createFile(cmpName, currentFile);
-			printf("File created: %s\n", currentFile->cmpName);
 		}
 
 		if(last){
@@ -159,8 +156,6 @@ struct file_struct *addFileByPath(char *pathStart) {
 
 		path++;
 	}
-
-	printf("Path size: %ld\n", path - pathStart);
 
 	if (path - pathStart > MAX_FILE_NAME_SIZE) {
 		printAndExit("File name exceeds max file name size");
@@ -241,27 +236,95 @@ struct group_struct *createGroup(char *groupname) {
 	return group;		
 }
 
+struct group_struct *findUserGroup(struct user_struct *user, char *groupname) {
+	struct user_group_list *userGroupContainer = user->groups;
+
+	while (userGroupContainer != NULL) {
+		struct group_struct *group = userGroupContainer->group;
+
+		if (strcmp(group->groupname, groupname) == 0) {
+			return group;
+		}
+
+		userGroupContainer = userGroupContainer->next;
+	}
+
+	return NULL;
+}
+
+struct user_struct *findGroupUser(struct group_struct *group, char *username) {
+	struct group_user_list *groupUserContainer = group->users;
+
+	while (groupUserContainer != NULL) {
+		struct user_struct *user = groupUserContainer->user;
+
+		if (strcmp(user->username, username) == 0) {
+			return user;
+		}
+
+		groupUserContainer = groupUserContainer->next;
+	}
+
+	return NULL;
+}
+
+void addUserToGroup(struct user_struct *user, struct group_struct *group) {
+	struct group_struct *userGroup = findUserGroup(user, group->groupname);
+	struct user_struct *groupUser = findGroupUser(group, user->username);
+
+	if(userGroup == NULL) {
+		printf("Adding group %s to user %s \n", group->groupname, user->username);
+
+		struct user_group_list *userGroupContainer = malloc(sizeof(struct user_group_list));
+
+		if (userGroupContainer == NULL) {
+			printAndExit(NULL);
+		}
+
+		userGroupContainer->group = group;
+		userGroupContainer->next = user->groups;
+		user->groups = userGroupContainer;
+	} else {
+		printf("User %s already has group %s\n", user->username, group->groupname);		
+	}
+
+
+	if (groupUser == NULL) {	
+		printf("Adding user %s to group %s \n", user->username, group->groupname);
+
+		struct group_user_list *groupUserContainer = malloc(sizeof(struct group_user_list));
+
+		if (groupUserContainer == NULL) {
+			printAndExit(NULL);
+		}
+
+		groupUserContainer->user = user;
+		groupUserContainer->next = group->users;
+		group->users = groupUserContainer;
+	} else {
+		printf("Group %s already has user %s \n", group->groupname, user->username);
+	}
+}
+
 int addUserAndGroup(char *username, char *groupname) {
 	struct user_struct *user = findUserByUsername(username);
 	struct group_struct *group = findGroupByGroupname(groupname);
 
 	if (user == NULL) {
-		printf("Creating user %s\n", username);
 		user = createUser(username);
 	} else {
-		printf("User %s already existed\n", username);
 		free(username);
 	}
 
 
 	if (group == NULL) {
-		printf("Creatring group %s\n", groupname);
 		group = createGroup(groupname);
 	} else {
-		printf("Group %s already existed\n", groupname);
 		free(groupname);
 	}
 
+
+	addUserToGroup(user, group);
 
 
 	return 0;
@@ -318,6 +381,11 @@ int parseUserDefinitionLine(char *line) {
 
 	char *groupname = strndup(groupStart, len);
 
+
+	if (noFile) {
+
+	}
+
 	addUserAndGroup(username, groupname);
 
 	return 0;
@@ -340,12 +408,14 @@ int main(int argc, char *argv[]) {
 	}
 
 	parseUserDefinitionLine("nicolas.mesa");
+	parseUserDefinitionLine("nicolas.mesa");
 	parseUserDefinitionLine("nicolas.mesaaassa");
 	parseUserDefinitionLine("nicolas.caasd");
 	parseUserDefinitionLine("sdfas.mesa");
 	parseUserDefinitionLine("ff.f");
 	parseUserDefinitionLine("ff.mesa");
 	parseUserDefinitionLine("ff.mesaaassa");
+	parseUserDefinitionLine("nicolas.mesa");
 
 	printf("%s\n", root->cmpName);
 
