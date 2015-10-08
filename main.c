@@ -13,8 +13,32 @@ struct file_struct {
 	char cmpName[MAX_CMP_SIZE + 1];	
 };
 
+struct user_struct {
+	char *username;
+	struct user_struct *next; // Only used to traverse all users
+	struct user_group_list *groups;
+};
+
+struct group_struct {
+	char *groupname;
+	struct group_struct *next; //Only used to traverse all groups
+	struct group_user_list *users;	
+};
+
+struct group_user_list {
+	struct user_struct *user;
+	struct group_user_list *next;
+};
+
+struct user_group_list {
+	struct group_struct *group;
+	struct user_group_list *next;
+};
+
 
 static struct file_struct *root;
+static struct user_struct *usersHead = NULL;
+static struct group_struct *groupsHead = NULL;
 
 
 void printAndExit(char *msg) {
@@ -76,7 +100,7 @@ struct file_struct *createFile(char *cmpName, struct file_struct *parent) {
 
 struct file_struct *addFileByPath(char *pathStart) {
 	char cmpName[MAX_CMP_SIZE + 1];	
-	int i, pathLength;
+	int pathLength;
 	char *path = pathStart;	
 	struct file_struct *currentFile = root;
 
@@ -145,6 +169,160 @@ struct file_struct *addFileByPath(char *pathStart) {
 	return currentFile;	
 }
 
+struct user_struct *findUserByUsername(char *username) {
+	struct user_struct *window = usersHead;
+
+	while (window != NULL) {
+		if (strcmp(username, window->username) == 0) {
+			return window;
+		}
+
+		window = window->next;
+	}
+
+	return NULL;
+}
+
+struct group_struct *findGroupByGroupname(char *groupname) {
+	struct group_struct *window = groupsHead;
+
+	while (window != NULL) {
+		if (strcmp(groupname, window->groupname) == 0) {
+			return window;
+		}
+
+		window = window->next;
+	}
+
+	return NULL;
+}
+
+struct user_struct *createUser(char *username) {
+	struct user_struct *user = findUserByUsername(username);
+
+	if (user != NULL) {
+		printAndExit("User already exists");
+	}
+
+	user = malloc(sizeof(struct user_struct));
+
+	if(user == NULL) {
+		printAndExit(NULL);
+	}
+
+	user->username = username;
+	user->next = usersHead;
+	user->groups = NULL;
+
+	usersHead = user;	
+
+	return user;		
+}
+
+struct group_struct *createGroup(char *groupname) {
+	struct group_struct *group = findGroupByGroupname(groupname);
+
+	if (group != NULL) {
+		printAndExit("Group already exists");
+	}
+
+	group = malloc(sizeof(struct group_struct));
+
+	if(group == NULL) {
+		printAndExit(NULL);
+	}
+
+	group->groupname = groupname;
+	group->next = groupsHead;
+	group->users = NULL;
+
+	groupsHead = group;	
+
+	return group;		
+}
+
+int addUserAndGroup(char *username, char *groupname) {
+	struct user_struct *user = findUserByUsername(username);
+	struct group_struct *group = findGroupByGroupname(groupname);
+
+	if (user == NULL) {
+		printf("Creating user %s\n", username);
+		user = createUser(username);
+	} else {
+		printf("User %s already existed\n", username);
+		free(username);
+	}
+
+
+	if (group == NULL) {
+		printf("Creatring group %s\n", groupname);
+		group = createGroup(groupname);
+	} else {
+		printf("Group %s already existed\n", groupname);
+		free(groupname);
+	}
+
+
+
+	return 0;
+	// if any of them is not found, free memory for the string (username or groupname)
+}
+
+int parseUserDefinitionLine(char *line) {
+	char *userStart = line;
+	char *groupStart;
+	char c;
+	int len = 0;
+
+	//@todo *.group, user.*, *.*
+
+	// Get user name
+	while((c = *line) != '.') {
+		if (c == '\0' || c == '\n') {
+			printAndExit("Invalid string supplied for the users");
+		}		
+
+		len++;
+		line++;
+	}
+
+
+	if (!len) {
+		printAndExit("Invalid string supplied for the users");
+	}
+
+	char *username = strndup(userStart, len);
+	int noFile = 0;
+
+	len = 0;
+	line++;
+	groupStart = line;	
+
+	// Get group name
+	while((c = *line) != ' ') {
+		if (c == '\n'){
+			noFile = 1;
+			break;
+		}
+
+		if (c == '\0') {
+			// @todo
+			//printAndExit("Unexpected end of input");
+			break;
+		}		
+
+		len++;
+		line++;
+	}
+
+
+	char *groupname = strndup(groupStart, len);
+
+	addUserAndGroup(username, groupname);
+
+	return 0;
+}
+
 int initFs() {
 	root = createFile("/", NULL);
 	createFile("tmp", root);
@@ -160,6 +338,14 @@ int main(int argc, char *argv[]) {
 	if (initFs()) {
 		return 1;
 	}
+
+	parseUserDefinitionLine("nicolas.mesa");
+	parseUserDefinitionLine("nicolas.mesaaassa");
+	parseUserDefinitionLine("nicolas.caasd");
+	parseUserDefinitionLine("sdfas.mesa");
+	parseUserDefinitionLine("ff.f");
+	parseUserDefinitionLine("ff.mesa");
+	parseUserDefinitionLine("ff.mesaaassa");
 
 	printf("%s\n", root->cmpName);
 
