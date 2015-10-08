@@ -166,7 +166,6 @@ struct file_struct *findFileByPath(char *pathStart) {
 
 struct file_struct *addFileByPath(char *pathStart) {
 	char cmpName[MAX_CMP_SIZE + 1];	
-	int pathLength;
 	char *path = pathStart;	
 	struct file_struct *currentFile = root;
 
@@ -179,7 +178,6 @@ struct file_struct *addFileByPath(char *pathStart) {
 	}
 
 	path++;
-	pathLength = 1;
 
 	while (*path != '\0') {
 		int cmpLength = 0;
