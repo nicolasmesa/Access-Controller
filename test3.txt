@@ -1,0 +1,14 @@
+user.group home/slash
+usera.groupa /home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/home/sl
+userb.groupb /home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/home/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/slash/home/slash/home/s
+userc.groupc /home/verylongcomponentshouldfail/ihope
+userd.groupd /home
+.mesa /home/invalid
+invalid1.group /home/number
+.mesa /home/invalid
+invalid.group1 /home/number
+nicolas. /home/invalid
+nicolas.mesa
+nicolas.mesa /home/valid
+nicolas.mesa /home/invalid
+

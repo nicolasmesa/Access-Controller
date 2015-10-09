@@ -7,6 +7,13 @@
 #define MAX_FILE_NAME_SIZE 256
 #define INITIAL_LINE_SIZE 100
 
+#define U_VALID 0
+#define U_INVALID 1
+
+#define C_YES 0
+#define C_NO 1
+#define C_INVALID 2
+
 struct file_struct {
 	struct file_struct *next;
 	struct file_struct *parent;
@@ -47,11 +54,37 @@ struct acl_entry {
 	int writePermission;
 };
 
+struct error_struct {
+	int read;
+	char *message;
+};
+
 
 static struct file_struct *root;
 static struct user_struct *usersHead = NULL;
 static struct group_struct *groupsHead = NULL;
+static struct error_struct error = {1, NULL};
+static char defaultErrorMsg[] = "Error with this entry";
 
+
+void setError(char *msg) {
+	if (error.read == 0) {
+		printf("Warning. Setting error without reading prior message (%s)\n", error.message);
+	}
+
+	error.read = 0;
+	error.message = strdup(msg);
+}
+
+char *getError(){
+	if (error.read) {
+		printf("Warning. Reading error twice (%s)\n", error.message);
+		return defaultErrorMsg;
+	}
+
+	error.read = 1;
+	return error.message;
+}
 
 void printAndExit(char *msg) {
 	if (msg == NULL) {
@@ -78,7 +111,8 @@ struct file_struct *findFileInListByName(struct file_struct *file, char *cmpName
 
 int addChildFile(struct file_struct *parent, struct file_struct *child) {
     if (findFileInListByName(parent->children, child->cmpName)) {
-            printAndExit("Error: File name already exists");            
+    	// Shouldn't happen
+        printAndExit("Error: File name already exists");            
     }
 
     child->next = parent->children;
@@ -170,14 +204,21 @@ struct file_struct *addFileByPath(char *pathStart) {
 	struct file_struct *currentFile = root;
 
 	if (!path) {
-		printAndExit("Undefined path");
+		setError("Undefined file path");
+		return NULL;
 	}
 
 	if (*path != '/') {
-		printAndExit("File path must start with /");
+		setError("File path must start with /");
+		return NULL;
 	}
 
 	path++;
+
+	if (strlen(path) > MAX_FILE_NAME_SIZE) {
+		setError("File name exceeds max file name size");
+		return NULL;
+	}
 
 	while (*path != '\0') {
 		int cmpLength = 0;
@@ -195,7 +236,8 @@ struct file_struct *addFileByPath(char *pathStart) {
 
 			if (cmpLength > MAX_CMP_SIZE) {
 				cmpName[MAX_CMP_SIZE] = '\0';
-				printAndExit("Component longer than allowed");
+				setError("Component longer than allowed");
+				return NULL;
 			}
 		}
 
@@ -205,7 +247,8 @@ struct file_struct *addFileByPath(char *pathStart) {
 		struct file_struct *temp = findFileInListByName(currentFile->children, cmpName);
 
 		if(last && temp) {
-			printAndExit("File already existed");
+			setError("File already existed");
+			return NULL;
 		}
 
 		if (temp) {			
@@ -219,10 +262,6 @@ struct file_struct *addFileByPath(char *pathStart) {
 		}
 
 		path++;
-	}
-
-	if (path - pathStart > MAX_FILE_NAME_SIZE) {
-		printAndExit("File name exceeds max file name size");
 	}
 
 	return currentFile;	
@@ -260,7 +299,8 @@ struct user_struct *createUser(char *username) {
 	struct user_struct *user = findUserByUsername(username);
 
 	if (user != NULL) {
-		printAndExit("User already exists");
+		// Should never happen
+		printAndExit("User already exists.");
 	}
 
 	user = malloc(sizeof(struct user_struct));
@@ -489,6 +529,14 @@ void addAclToFile(struct file_struct *file, char *permissions, struct user_struc
 	file->aclTail = aclEntry;
 }
 
+int validateOnlyLetter(char c) {
+	if (c < 'a' || c > 'z') {
+		return 0;
+	}
+
+	return 1;
+}
+
 char *getUsernameAndGroupname(char *userStart, char **username, char **groupname) {
 	char *line = userStart;
 	char *groupStart;
@@ -499,9 +547,10 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 
 	// Get user name
 	while((c = *line) != '.') {
-		if (c == '\0' || c == '\n') {
-			printAndExit("Invalid string supplied for the users");
-		}		
+		if (!validateOnlyLetter(c)) {
+			setError("Invalid characters in the user name");
+			return NULL;
+		}
 
 		len++;
 		line++;
@@ -509,7 +558,8 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 
 
 	if (!len) {
-		printAndExit("Invalid string supplied for the users");
+		setError("Empty string supplied for the users");
+		return NULL;
 	}
 
 	*username = strndup(userStart, len);	
@@ -524,10 +574,20 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 			break;
 		}
 
-		// Validation. This way, we prevent the \n
+		if (!validateOnlyLetter(c)) {
+			free(*username);
+			setError("Invalid characters in the group name");
+			return NULL;
+		}
 
 		len++;
 		line++;
+	}
+
+	if (!len) {
+		free(*username);
+		setError("Empty string supplied for the group name");
+		return NULL;
 	}
 
 	*groupname = strndup(groupStart, len);
@@ -541,7 +601,8 @@ char *getFilepath(char *line, char **filePath) {
 	char c;
 
 	if (*filePathStart != '/') {
-		printAndExit("File path must start with /");
+		setError("File path must start with /");
+		return NULL;
 	}
 
 	// Get file
@@ -551,7 +612,8 @@ char *getFilepath(char *line, char **filePath) {
 	}
 
 	if (len > MAX_FILE_NAME_SIZE) {
-		printAndExit("File name exceeds max file name size");
+		setError("File name exceeds max file name size");
+		return NULL;
 	}
 
 	*filePath = strndup(filePathStart, len);
@@ -565,51 +627,86 @@ int parseUserDefinitionLine(char *line) {
 	struct user_struct *user;
 	struct group_struct *group;
 	struct user_struct *possibleUser;
+	struct file_struct *file;
 	char *username;
 	char *groupname;	
 	int len = 0;
 
 	line = getUsernameAndGroupname(line, &username, &groupname);
 
+	// An error ocurred
+	if (line == NULL) {
+		return U_INVALID;
+	}
+
 	possibleUser = findUserByUsername(username);
 
-	addUserAndGroup(username, groupname);
-
-	user = findUserByUsername(username);
-	group = findGroupByGroupname(groupname);
-
-	// Means no file
-	if (*line != ' ') {
+	// Means no file specified and first time we see the user
+	if (*line != ' ' && possibleUser == NULL) {			
 		free(groupname);
 		free(username);
 
-		if (possibleUser == NULL) {
-			printAndExit("The first instance of a user must have a file name");
-		}
+		setError("The first instance of a user must have a file name");			
+		return U_INVALID;			
+	}
+
+	// Means no file specified but it is ot the first time we see the user
+	if (*line != ' ') {
+		addUserAndGroup(username, groupname);
+		user = findUserByUsername(username);
+		group = findGroupByGroupname(groupname);
 
 		addAclToFile(user->file, "rw", user, group);
 
-		return 0;
+		return U_VALID;
 	}
 
 	// Skip ' '
 	line++;
-	line = getFilepath(line, &filePathStart);	
+	line = getFilepath(line, &filePathStart);
+
+	// Error with the file. Error msg is already set
+	if (line == NULL) {		
+		free(groupname);
+		free(username);
+
+		return U_INVALID;
+	}
 
 	len = strlen(filePathStart);
 
-	if (len) {
-		if (possibleUser != NULL) {
-			printAndExit("Only the first instance of the user can contain a file");		
-		}
-
-		fileName = strndup(filePathStart, len);		
-		user->file = addFileByPath(fileName);
-	} else {
-		if (possibleUser == NULL) {			
-			printAndExit("The first instance of a user must have a file name");	
-		}		
+	// Means file specified but it is not the first time we see the user
+	if (len && possibleUser != NULL) {
+		free(groupname);
+		free(username);
+		setError("Only the first instance of the user can contain a file");		
+		return U_INVALID;
 	}
+
+	// Means no file specified but it is the first time we see the user
+	if (!len && possibleUser == NULL) {
+		free(groupname);
+		free(username);
+
+		setError("The first instance of a user must have a file name");	
+		return U_INVALID;
+	}	
+
+	fileName = strndup(filePathStart, len);		
+	file = addFileByPath(fileName);
+
+	// Error creating the file. Error msg is already set
+	if (file == NULL) {
+		free(groupname);
+		free(username);
+		return U_INVALID;
+	}
+
+	addUserAndGroup(username, groupname);
+	user = findUserByUsername(username);
+	group = findGroupByGroupname(groupname);
+
+	user->file = file;
 
 	addAclToFile(user->file, "rw", user, group);
 
@@ -620,7 +717,7 @@ int parseUserDefinitionLine(char *line) {
 	free(groupname);
 	free(username);
 
-	return 0;
+	return U_VALID;
 }
 
 int initFs() {
@@ -672,6 +769,9 @@ char *getLine() {
 
 int parseUserDefinitionSection() {
 	char *line;
+	int num = 1;
+	int result;
+	char *error;
 
 	while (1) {
 		line = getLine();
@@ -681,8 +781,16 @@ int parseUserDefinitionSection() {
 			break;
 		}
 
-		parseUserDefinitionLine(line);
+		result = parseUserDefinitionLine(line);
 
+		if (result == U_VALID) {
+			printf("%d Y\n", num);
+		} else {			
+			error = getError();
+			printf("%d X %s\n", num, error);
+		}
+
+		num++;
 		free(line);
 	}
 
@@ -770,12 +878,17 @@ void clearAclForFile(struct file_struct *file) {
 
 int executeWrite(struct user_struct *user, struct group_struct *group, struct file_struct *file) {	
 	struct acl_entry *aclEntry = findAclByFileUserAndGroup(file, user, group);
+	struct file_struct *parentFile = file->parent;
 
 	if (aclEntry == NULL || !aclEntry->writePermission) {
 		return 1;
 	}
 
-	return executeRead(user, group, file);
+	if (parentFile == NULL) {
+		return 1;
+	}
+
+	return executeRead(user, group, parentFile);
 }
 
 void executeCreate(struct user_struct *user, struct group_struct *group, char *filename) {
