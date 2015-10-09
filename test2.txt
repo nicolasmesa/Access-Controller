@@ -1,0 +1,14 @@
+smb.faculty /home/smb
+smb.columbia
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+nicolas.student /home/nicolas
+.
+READ nicolas.student /home/nicolas
+READ nicolas.student /home/sal
+WRITE nicolas.student /home/nicolas
+ACL nicolas.student /home/nicolas
+DELETE nicolas.student /home/nicolas
+CREATE nicolas.student /home/nicolas/mesa
+

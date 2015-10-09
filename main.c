@@ -151,7 +151,7 @@ struct file_struct *findFileByPath(char *pathStart) {
 		currentFile = findFileInListByName(currentFile->children, cmpName);
 
 		if (currentFile == NULL) {			
-			printAndExit("File does not exist");
+			return NULL;
 		}
 
 		if (last) {
@@ -439,11 +439,28 @@ struct acl_entry *createAclEntry(char *permissions, struct user_struct *user, st
 	return aclEntry;
 }
 
+int aclUserMatch(struct acl_entry *aclEntry, struct user_struct *user) {
+	if (aclEntry->user == NULL || aclEntry->user == user) {
+		return 1;
+	}
+
+	return 0;
+}
+
+
+int aclGroupMatch(struct acl_entry *aclEntry, struct group_struct *group) {
+	if (aclEntry->group == NULL || aclEntry->group == group) {
+		return 1;
+	}
+
+	return 0;
+}
+
 struct acl_entry *findAclByFileUserAndGroup(struct file_struct *file, struct user_struct *user, struct group_struct *group){
 	struct acl_entry *aclEntry;
 
 	for (aclEntry = file->aclHead; aclEntry != NULL; aclEntry = aclEntry->next) {
-		if (aclEntry->user == user && aclEntry->group == group) {
+		if (aclUserMatch(aclEntry, user) && aclGroupMatch(aclEntry, group)) {
 			return aclEntry;
 		}
 	}
@@ -472,14 +489,9 @@ void addAclToFile(struct file_struct *file, char *permissions, struct user_struc
 	file->aclTail = aclEntry;
 }
 
-int parseUserDefinitionLine(char *line) {
-	char *userStart = line;
+char *getUsernameAndGroupname(char *userStart, char **username, char **groupname) {
+	char *line = userStart;
 	char *groupStart;
-	char *filePathStart;
-	char *fileName = NULL;
-	struct user_struct *user;
-	struct group_struct *group;
-	struct user_struct *possibleUser;
 	char c;
 	int len = 0;
 
@@ -500,11 +512,7 @@ int parseUserDefinitionLine(char *line) {
 		printAndExit("Invalid string supplied for the users");
 	}
 
-	char *username = strndup(userStart, len);
-
-	possibleUser = findUserByUsername(username);
-
-	int noFile = 0;
+	*username = strndup(userStart, len);	
 
 	len = 0;
 	line++;
@@ -513,40 +521,28 @@ int parseUserDefinitionLine(char *line) {
 	// Get group name
 	while((c = *line) != ' ') {
 		if (c == '\0'){
-			noFile = 1;
 			break;
 		}
+
+		// Validation. This way, we prevent the \n
 
 		len++;
 		line++;
 	}
 
+	*groupname = strndup(groupStart, len);
 
-	char *groupname = strndup(groupStart, len);
+	return line;
+}
 
-	addUserAndGroup(username, groupname);
+char *getFilepath(char *line, char **filePath) {
+	int len = 0;	
+	char *filePathStart = line;	
+	char c;
 
-	user = findUserByUsername(username);
-	group = findGroupByGroupname(groupname);
-
-
-	if (noFile) {
-		if (possibleUser == NULL) {
-			printAndExit("The first instance of a user must have a file name");
-		}
-
-		addAclToFile(user->file, "rw", user, group);
-
-		free(groupname);
-		free(username);
-
-		return 0;
+	if (*filePathStart != '/') {
+		printAndExit("File path must start with /");
 	}
-
-	
-	len = 0;
-	line++;
-	filePathStart = line;	
 
 	// Get file
 	while((c = *line) != '\0') {		
@@ -554,7 +550,54 @@ int parseUserDefinitionLine(char *line) {
 		line++;
 	}
 
-	// File name
+	if (len > MAX_FILE_NAME_SIZE) {
+		printAndExit("File name exceeds max file name size");
+	}
+
+	*filePath = strndup(filePathStart, len);
+
+	return line;	
+}
+
+int parseUserDefinitionLine(char *line) {	
+	char *filePathStart;
+	char *fileName = NULL;
+	struct user_struct *user;
+	struct group_struct *group;
+	struct user_struct *possibleUser;
+	char *username;
+	char *groupname;	
+	int len = 0;
+
+	line = getUsernameAndGroupname(line, &username, &groupname);
+
+	possibleUser = findUserByUsername(username);
+
+	addUserAndGroup(username, groupname);
+
+	user = findUserByUsername(username);
+	group = findGroupByGroupname(groupname);
+
+	// Means no file
+	if (*line != ' ') {
+		free(groupname);
+		free(username);
+
+		if (possibleUser == NULL) {
+			printAndExit("The first instance of a user must have a file name");
+		}
+
+		addAclToFile(user->file, "rw", user, group);
+
+		return 0;
+	}
+
+	// Skip ' '
+	line++;
+	line = getFilepath(line, &filePathStart);	
+
+	len = strlen(filePathStart);
+
 	if (len) {
 		if (possibleUser != NULL) {
 			printAndExit("Only the first instance of the user can contain a file");		
@@ -569,7 +612,6 @@ int parseUserDefinitionLine(char *line) {
 	}
 
 	addAclToFile(user->file, "rw", user, group);
-
 
 	if (fileName != NULL) {
 		free(fileName);
@@ -691,15 +733,219 @@ void printAclForFile(struct file_struct *file) {
 	}
 }
 
+int userBelongsToGroup(struct user_struct *user, struct group_struct *group){
+	if (findGroupUser(group, user->username) == NULL) {
+		return 0;
+	}
+
+	return 1;
+}
+
+int executeRead(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
+	struct file_struct *currentFile = file;	
+
+	while (currentFile != NULL) {		
+		struct acl_entry *aclEntry = findAclByFileUserAndGroup(currentFile, user, group);
+
+		if (aclEntry == NULL || !aclEntry->readPermission) {			
+			return 1;
+		}
+
+		currentFile = currentFile->parent;
+	}
+
+	return 0;
+}
+
+void clearAclForFile(struct file_struct *file) {
+	struct acl_entry *aclEntry = file->aclHead;	
+
+	while (aclEntry != NULL) {
+		printf("Clearing entry\n");
+		struct acl_entry *temp = aclEntry;
+		aclEntry = aclEntry->next;
+		free(temp);
+	}
+}
+
+int executeWrite(struct user_struct *user, struct group_struct *group, struct file_struct *file) {	
+	struct acl_entry *aclEntry = findAclByFileUserAndGroup(file, user, group);
+
+	if (aclEntry == NULL || !aclEntry->writePermission) {
+		return 1;
+	}
+
+	return executeRead(user, group, file);
+}
+
+void executeCreate(struct user_struct *user, struct group_struct *group, char *filename) {
+	printf("Create\n");
+}
+
+int executeDelete(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
+	struct file_struct *parentFile = file->parent;
+	struct file_struct *window = parentFile->children;
+
+	if (file->children != NULL)	{
+		return 1;
+	}
+
+	// Root
+	if (parentFile == NULL) {
+		return 1;
+	}
+
+	// Can't write
+	if (executeWrite(user, group, file)) {
+		return 1;
+	}
+
+	if (window == file) {
+		parentFile->children = file->next;
+	} else  {
+		while (window != NULL) {
+			if (window->next == file) {
+				window->next = file->next;
+			}
+
+			window = window->next;
+		}
+	}
+
+	clearAclForFile(file);
+	free(file);
+
+	return 0;
+}
+
+void executeAcl(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
+	printf("Acl\n");
+}
+
+void executeCommand(char *command, char *username, char *groupname, char *filename) {
+	struct user_struct *user = findUserByUsername(username);
+	struct group_struct *group = findGroupByGroupname(groupname);
+	struct file_struct *file = findFileByPath(filename);	
+
+	if (user == NULL) {
+		printAndExit("User does not exist");
+	}
+
+	if (group == NULL) {
+		printAndExit("Group does not exist");
+	}
+
+	if (!userBelongsToGroup(user, group)) {
+		printAndExit("User does not belong to group");
+	}
+
+
+	if (strcmp(command, "READ") == 0) {		
+		if (file == NULL) {
+			printAndExit("File does not exist");
+		}
+
+		executeRead(user, group, file);
+		return;
+	}
+
+
+	if (strcmp(command, "WRITE") == 0) {		
+		if (file == NULL) {
+			printAndExit("File does not exist");
+		}
+
+		executeWrite(user, group, file);
+		return;
+	}
+
+
+	if (strcmp(command, "CREATE") == 0) {		
+		if (file != NULL) {
+			printAndExit("File already exists");
+		}		
+
+		executeCreate(user, group, filename);
+		return;
+	}
+
+
+	if (strcmp(command, "DELETE") == 0) {		
+		if (file == NULL) {
+			printAndExit("File does not exist");
+		}
+
+		executeDelete(user, group, file);
+		return;
+	}
+
+
+	if (strcmp(command, "ACL") == 0) {		
+		if (file == NULL) {
+			printAndExit("File does not exist");
+		}
+
+		executeAcl(user, group, file);
+		return;
+	}
+}
+
+void parseCommandLine(char *line) {
+	char command[7];
+	int len = 0;
+	char *username;
+	char *groupname;
+	char *filename;	
+	char c;
+
+	while ((c = *line) != ' ') {
+		if (len > 6) {
+			printAndExit("Invalid command");
+		}
+
+		command[len] = *line;		
+
+		len++;
+		line++;
+	}
+
+	command[len] = '\0';
+
+	line++;
+
+	line = getUsernameAndGroupname(line, &username, &groupname);
+
+	if (*line != ' ') {
+		printAndExit("You have to include a file name");
+	}
+
+	line++;
+	line = getFilepath(line, &filename);	
+
+	executeCommand(command, username, groupname, filename);
+}
+
+void parseFileOpearationSection(){
+	char *line;
+
+	while (1) {
+		line = getLine();
+
+		if (*line == '\0') {			
+			free(line);		
+			break;	
+		}
+
+		parseCommandLine(line);
+
+		free(line);
+	}
+}
+
 int main(int argc, char *argv[]) {
 	initFs();
-
-	printAclForFile(root);
-
 	parseUserDefinitionSection();
-
-	struct file_struct *file = findFileByPath("/home/smb");
-	printAclForFile(file);
+	parseFileOpearationSection();
 
 	return 0;
 }
