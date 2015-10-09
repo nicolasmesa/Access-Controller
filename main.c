@@ -784,10 +784,10 @@ int parseUserDefinitionSection() {
 		result = parseUserDefinitionLine(line);
 
 		if (result == U_VALID) {
-			printf("%d Y\n", num);
+			printf("%d\tY\n", num);
 		} else {			
 			error = getError();
-			printf("%d X %s\n", num, error);
+			printf("%d\tX\t%s\n", num, error);
 		}
 
 		num++;
@@ -849,31 +849,31 @@ int userBelongsToGroup(struct user_struct *user, struct group_struct *group){
 	return 1;
 }
 
+void clearAclForFile(struct file_struct *file) {
+	struct acl_entry *aclEntry = file->aclHead;	
+
+	while (aclEntry != NULL) {		
+		struct acl_entry *temp = aclEntry;
+		aclEntry = aclEntry->next;
+		free(temp);
+	}
+}
+
 int executeRead(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
 	struct file_struct *currentFile = file;	
 
 	while (currentFile != NULL) {		
 		struct acl_entry *aclEntry = findAclByFileUserAndGroup(currentFile, user, group);
 
-		if (aclEntry == NULL || !aclEntry->readPermission) {			
-			return 1;
+		if (aclEntry == NULL || !aclEntry->readPermission) {
+			setError("No read permissions on path to file");		
+			return C_NO;
 		}
 
 		currentFile = currentFile->parent;
 	}
 
-	return 0;
-}
-
-void clearAclForFile(struct file_struct *file) {
-	struct acl_entry *aclEntry = file->aclHead;	
-
-	while (aclEntry != NULL) {
-		printf("Clearing entry\n");
-		struct acl_entry *temp = aclEntry;
-		aclEntry = aclEntry->next;
-		free(temp);
-	}
+	return C_YES;
 }
 
 int executeWrite(struct user_struct *user, struct group_struct *group, struct file_struct *file) {	
@@ -881,18 +881,21 @@ int executeWrite(struct user_struct *user, struct group_struct *group, struct fi
 	struct file_struct *parentFile = file->parent;
 
 	if (aclEntry == NULL || !aclEntry->writePermission) {
-		return 1;
+		setError("No write permissions on this file");
+		return C_NO;
 	}
 
 	if (parentFile == NULL) {
-		return 1;
+		setError("No write permissions on root file");
+		return C_NO;
 	}
 
 	return executeRead(user, group, parentFile);
 }
 
-void executeCreate(struct user_struct *user, struct group_struct *group, char *filename) {
-	printf("Create\n");
+int executeCreate(struct user_struct *user, struct group_struct *group, char *filename) {
+	setError("Execute create not implemented");
+	return C_INVALID;
 }
 
 int executeDelete(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
@@ -900,17 +903,19 @@ int executeDelete(struct user_struct *user, struct group_struct *group, struct f
 	struct file_struct *window = parentFile->children;
 
 	if (file->children != NULL)	{
-		return 1;
+		setError("Can't delete a file that has children");
+		return C_NO;
 	}
 
 	// Root
 	if (parentFile == NULL) {
-		return 1;
+		setError("Can't delete the root file");
+		return C_NO;
 	}
 
 	// Can't write
-	if (executeWrite(user, group, file)) {
-		return 1;
+	if (executeWrite(user, group, file) == C_NO) {		
+		return C_NO;
 	}
 
 	if (window == file) {
@@ -928,82 +933,89 @@ int executeDelete(struct user_struct *user, struct group_struct *group, struct f
 	clearAclForFile(file);
 	free(file);
 
-	return 0;
+	return C_YES;
 }
 
-void executeAcl(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
-	printf("Acl\n");
+int executeAcl(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
+	setError("Execute acl not implemented");
+	return C_INVALID;
 }
 
-void executeCommand(char *command, char *username, char *groupname, char *filename) {
+int executeCommand(char *command, char *username, char *groupname, char *filename) {
 	struct user_struct *user = findUserByUsername(username);
 	struct group_struct *group = findGroupByGroupname(groupname);
 	struct file_struct *file = findFileByPath(filename);	
 
 	if (user == NULL) {
-		printAndExit("User does not exist");
+		setError("User does not exist");
+		return C_INVALID;
 	}
 
 	if (group == NULL) {
-		printAndExit("Group does not exist");
+		setError("Group does not exist");
+		return C_INVALID;
 	}
 
 	if (!userBelongsToGroup(user, group)) {
-		printAndExit("User does not belong to group");
+		setError("User does not belong to group");
+		return C_INVALID;		
 	}
 
 
 	if (strcmp(command, "READ") == 0) {		
 		if (file == NULL) {
-			printAndExit("File does not exist");
+			setError("File does not exist");
+			return C_INVALID;
 		}
 
-		executeRead(user, group, file);
-		return;
+		return executeRead(user, group, file);		
 	}
 
 
 	if (strcmp(command, "WRITE") == 0) {		
 		if (file == NULL) {
-			printAndExit("File does not exist");
+			setError("File does not exist");
+			return C_INVALID;
 		}
 
-		executeWrite(user, group, file);
-		return;
+		return executeWrite(user, group, file);		
 	}
 
 
 	if (strcmp(command, "CREATE") == 0) {		
 		if (file != NULL) {
-			printAndExit("File already exists");
+			setError("File already exists");
+			return C_INVALID;
 		}		
 
-		executeCreate(user, group, filename);
-		return;
+		return executeCreate(user, group, filename);		
 	}
 
 
 	if (strcmp(command, "DELETE") == 0) {		
 		if (file == NULL) {
-			printAndExit("File does not exist");
+			setError("File does not exist");
+			return C_INVALID;
 		}
 
-		executeDelete(user, group, file);
-		return;
+		return executeDelete(user, group, file);		
 	}
 
 
 	if (strcmp(command, "ACL") == 0) {		
 		if (file == NULL) {
-			printAndExit("File does not exist");
+			setError("File does not exist");
+			return C_INVALID;
 		}
 
-		executeAcl(user, group, file);
-		return;
+		return executeAcl(user, group, file);		
 	}
+
+	setError("Invalid command");
+	return C_INVALID;
 }
 
-void parseCommandLine(char *line) {
+int parseCommandLine(char *line) {
 	char command[7];
 	int len = 0;
 	char *username;
@@ -1013,7 +1025,8 @@ void parseCommandLine(char *line) {
 
 	while ((c = *line) != ' ') {
 		if (len > 6) {
-			printAndExit("Invalid command");
+			setError("Invalid command");
+			return C_INVALID;
 		}
 
 		command[len] = *line;		
@@ -1029,17 +1042,26 @@ void parseCommandLine(char *line) {
 	line = getUsernameAndGroupname(line, &username, &groupname);
 
 	if (*line != ' ') {
-		printAndExit("You have to include a file name");
+		return C_INVALID;
+		setError("You have to include a file name");
 	}
 
 	line++;
-	line = getFilepath(line, &filename);	
+	line = getFilepath(line, &filename);
 
-	executeCommand(command, username, groupname, filename);
+	// Error msg already set
+	if (line == NULL) {
+		return C_INVALID;
+	}
+
+	return executeCommand(command, username, groupname, filename);
 }
 
 void parseFileOpearationSection(){
-	char *line;
+	char *line;	
+	int num = 1;
+	int result;
+	char *error;
 
 	while (1) {
 		line = getLine();
@@ -1049,8 +1071,23 @@ void parseFileOpearationSection(){
 			break;	
 		}
 
-		parseCommandLine(line);
+		result = parseCommandLine(line);
 
+		if (result == C_YES) {
+			printf("%d\tY\t%s\n", num, line);
+		}
+
+		if (result == C_NO) {
+			error = getError();
+			printf("%d\tN\t%s\t%s\n", num, line, error);
+		}
+
+		if (result == C_INVALID) {			
+			error = getError();
+			printf("%d\tX\t%s\t%s\n", num, line, error);
+		}
+
+		num++;
 		free(line);
 	}
 }
