@@ -1,0 +1,27 @@
+nicolas.mesa /home/nicolas
+nicolas.student
+user.group /home/user
+user.student
+.
+CREATE nicolas.mesa /home/nicolas/new
+nicolas.mesa rw
+*.student r
+.
+ACL nicolas.mesa /home/nicolas
+nicolas.mesa rw
+*.student r
+.
+READ user.student /home/nicolas/new
+WRITE user.student /home/nicolas/new
+CREATE nicolas.mesa /home/nicolas/second
+nicolas.mesa rw
+*.student -
+user.student r
+.
+READ user.student /home/nicolas/second
+CREATE nicolas.mesa /home/nicolas/new/other
+.
+DELETE nicolas.mesa /home/nicolas/new
+DELETE nicolas.mesa /home/nicolas/new/other
+DELETE nicolas.mesa /home/nicolas/new
+

@@ -422,33 +422,7 @@ int addUserAndGroup(char *username, char *groupname) {
 	return 0;
 }
 
-void validatePermissions(char *permissions){
-	if (permissions == NULL) {
-		printAndExit("Permissions are invalid");
-	}
-
-	int len = strlen(permissions);
-
-	if (len > 2) {
-		printAndExit("Permissions are invalid");
-	}
-
-	if (*permissions == '-' && len > 1){
-		printAndExit("Permissions are invalid");
-	}
-
-	if (len == 2 && (permissions[0] != 'r' || permissions[1] != 'w')) {
-		printAndExit("Permissions are invalid");
-	}
-
-	if (len == 1 && (permissions[0] != 'r' && permissions[0] != 'w')) {
-		printAndExit("Permissions are invalid");
-	}
-}
-
 struct acl_entry *createAclEntry(char *permissions, struct user_struct *user, struct group_struct *group) {
-	validatePermissions(permissions);
-
 	int len = strlen(permissions);
 	struct acl_entry *aclEntry = malloc(sizeof(struct acl_entry));
 
@@ -705,11 +679,6 @@ int parseUserDefinitionLine(char *line) {
 
 	// An error ocurred
 	if (line == NULL) {
-		return U_INVALID;
-	}
-
-	if (*line == '\0') {
-		setError("Invalid input");
 		return U_INVALID;
 	}
 
@@ -1450,7 +1419,7 @@ int parseCommandLine(char *line) {
 		return C_INVALID;
 	}
 
-	result = executeCommand(command, username, groupname, filename);
+	result = executeCommand(command, username, groupname, filename);	
 
 	free(username);
 	free(groupname);
@@ -1468,7 +1437,8 @@ void parseFileOpearationSection(){
 	while (1) {
 		line = getLine();
 
-		if (*line == '\0') {			
+
+		if (*line == '\0') {						
 			free(line);		
 			break;	
 		}
@@ -1498,9 +1468,6 @@ int main(int argc, char *argv[]) {
 	initFs();
 	parseUserDefinitionSection();
 	parseFileOpearationSection();
-
-	struct file_struct *file = findFileByPath("/home/nicolas/new");
-	printAclForFile(file);
 
 	return 0;
 }
