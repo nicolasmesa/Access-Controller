@@ -24,4 +24,13 @@ CREATE nicolas.mesa /home/nicolas/new/other
 DELETE nicolas.mesa /home/nicolas/new
 DELETE nicolas.mesa /home/nicolas/new/other
 DELETE nicolas.mesa /home/nicolas/new
-
+CREATE nicolas.mesa /home/nicolas/whatever
+*.* r
+nicolas.mesa rw
+.
+WRITE nicolas.mesa /home/nicolas/whatever
+READ nicolas.mesa /home/nicolas/whatever
+READ nicolas.student /home/nicolas/whatever
+READ user.group /home/nicolas/whatever
+READ user.student /home/nicolas/whatever
+WRITE user.student /home/nicolas/whatever
