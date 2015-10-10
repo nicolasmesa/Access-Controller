@@ -9,6 +9,7 @@ READ nicolas.student /home/nicolas
 READ nicolas.student /home/sal
 WRITE nicolas.student /home/nicolas
 ACL nicolas.student /home/nicolas
+.
 DELETE nicolas.student /home/nicolas
 CREATE nicolas.student /home/nicolas/mesa
-
+.

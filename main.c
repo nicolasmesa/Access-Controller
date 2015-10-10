@@ -512,7 +512,7 @@ int validateOnlyLetter(char c) {
 	return 1;
 }
 
-char *getUsername(char *userStart, char** username) {
+char *getUsername(char *userStart, char **username) {
 	char *line = userStart;
 	char c;
 	int len = 0;
@@ -534,7 +534,7 @@ char *getUsername(char *userStart, char** username) {
 		return NULL;
 	}
 
-	*username = strndup(userStart, len);	
+	*username = strndup(userStart, len);
 
 	return line;
 }
@@ -576,14 +576,14 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 
 	if (line == NULL) {
 		return NULL;
-	}	
+	}
 
 	line++;
 
 	line = getGroupname(line, groupname);
 
 	if (line == NULL) {
-		free(username);
+		free(*username);
 		return NULL;
 	}
 	
@@ -649,7 +649,13 @@ char *getFilepath(char *line, char **filePath) {
 	}
 
 	// Get file
-	while((c = *line) != '\0') {		
+	while((c = *line) != '\0') {
+
+		if (c != '/' && c != '.' && !validateOnlyLetter(c)) {
+			setError("Invalid characters in the file name");
+			return NULL;
+		}
+
 		len++;
 		line++;
 	}
@@ -675,7 +681,7 @@ int parseUserDefinitionLine(char *line) {
 	char *groupname;	
 	int len = 0;
 
-	line = getUsernameAndGroupname(line, &username, &groupname);
+	line = getUsernameAndGroupname(line, &username, &groupname);	
 
 	// An error ocurred
 	if (line == NULL) {
@@ -824,12 +830,17 @@ int parseUserDefinitionSection() {
 	while (1) {
 		line = getLine();
 
-		if (strcmp(line, ".") == 0) {
+		if (endOfInput) {
 			free(line);
 			break;
 		}
 
-		result = parseUserDefinitionLine(line);
+		if (strcmp(line, ".") == 0) {
+			free(line);
+			break;
+		}
+		
+		result = parseUserDefinitionLine(line);				
 
 		if (result == U_VALID) {
 			printf("%d\tY\n", num);
@@ -839,6 +850,7 @@ int parseUserDefinitionSection() {
 		}
 
 		num++;
+
 		free(line);
 	}
 
@@ -947,6 +959,11 @@ void ignoreRestOfAcl() {
 	while (1) {		
 		char *line = getLine();
 
+		if (*line == '\0') {						
+			free(line);		
+			break;	
+		}
+
 		if (strcmp(line, ".") == 0){
 			free(line);
 			break;
@@ -971,6 +988,12 @@ int parseAclList(struct acl_entry **aclEntryHead, struct acl_entry **aclEntryTai
 	while (1) {
 		line = getLine();
 		char *startOfLine = line;
+
+		if (*line == '\0') {						
+			free(startOfLine);
+			setError("Unexpected end of file");
+			return C_INVALID;			
+		}
 
 		if (strcmp(line, ".") == 0) {
 			free(startOfLine);
@@ -1280,7 +1303,7 @@ int executeDelete(struct user_struct *user, struct group_struct *group, struct f
 	}
 
 
-	result = executeWrite(user, group, file);
+	result = executeWrite(user, group, parentFile);
 
 	// Can't write
 	if (result != C_YES) {		
@@ -1436,7 +1459,6 @@ void parseFileOpearationSection(){
 
 	while (1) {
 		line = getLine();
-
 
 		if (*line == '\0') {						
 			free(line);		
