@@ -642,11 +642,14 @@ char *getFilepath(char *line, char **filePath) {
 	int len = 0;	
 	char *filePathStart = line;	
 	char c;
+	char *lastSlash;
 
 	if (*filePathStart != '/') {
 		setError("File path must start with /");
 		return NULL;
 	}
+
+	lastSlash = filePathStart;
 
 	// Get file
 	while((c = *line) != '\0') {
@@ -654,10 +657,19 @@ char *getFilepath(char *line, char **filePath) {
 		if (c != '/' && c != '.' && !validateOnlyLetter(c)) {
 			setError("Invalid characters in the file name");
 			return NULL;
-		}
+		}		
 
 		len++;
 		line++;
+
+		if (*line == '/') {
+			if (line - lastSlash < 2) {
+				setError("Can't have two consecutive slashes (/) in a file");
+				return NULL;
+			}
+
+			lastSlash = line;
+		}
 	}
 
 	if (len > MAX_FILE_NAME_SIZE) {
@@ -1193,6 +1205,8 @@ int executeCreate(struct user_struct *user, struct group_struct *group, char *fi
 
 	if (*lastSlash != '/') {		
 		setError("File path must start with /");
+		
+		ignoreRestOfAcl();
 		return C_INVALID;
 	}
 
@@ -1228,6 +1242,7 @@ int executeCreate(struct user_struct *user, struct group_struct *group, char *fi
 
 		free(parentPath);
 		free(cmpName);
+		ignoreRestOfAcl();
 
 		return C_INVALID;
 	}
@@ -1238,6 +1253,8 @@ int executeCreate(struct user_struct *user, struct group_struct *group, char *fi
 	if (result != C_YES) {		
 		free(parentPath);
 		free(cmpName);
+
+		ignoreRestOfAcl();
 		return result;
 	}
 
@@ -1246,6 +1263,7 @@ int executeCreate(struct user_struct *user, struct group_struct *group, char *fi
 		free(cmpName);
 
 		setError("File already exists");
+		ignoreRestOfAcl();
 		return C_INVALID;
 	}
 
@@ -1437,8 +1455,12 @@ int parseCommandLine(char *line) {
 	line++;
 	line = getFilepath(line, &filename);
 
-	// Error msg already set
+	// Error msg already set. 
 	if (line == NULL) {
+		if (strcmp(command, "CREATE") != 0 || strcmp(command, "ACL") != 0) {
+			ignoreRestOfAcl();
+		}
+
 		return C_INVALID;
 	}
 
