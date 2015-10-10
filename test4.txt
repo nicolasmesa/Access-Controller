@@ -2,9 +2,16 @@ nicolas.student /home/nicolas
 user.group /home/user
 double.slash /home//double
 letters.periods /home/n4
+existing.file /home/nicolas
 .
 READ user.group /home/nicolas
 WRITE nicolas.student /
+CREATE /home/nicolas/new
+.
+CREATE nicolas.student /home/nicolas/new
+.
+CREATE nicolas.student /home/nicolas/new
+.
 CREATE nicolas.student /home/nicolas//
 .
 CREATE nicolas.student /home/nicolas/new

@@ -1390,6 +1390,8 @@ int executeCommand(char *command, char *username, char *groupname, char *filenam
 	if (strcmp(command, "CREATE") == 0) {		
 		if (file != NULL) {
 			setError("File already exists");
+
+			ignoreRestOfAcl();
 			return C_INVALID;
 		}		
 
@@ -1410,6 +1412,8 @@ int executeCommand(char *command, char *username, char *groupname, char *filenam
 	if (strcmp(command, "ACL") == 0) {		
 		if (file == NULL) {
 			setError("File does not exist");
+			
+			ignoreRestOfAcl();
 			return C_INVALID;
 		}
 
@@ -1428,6 +1432,7 @@ int parseCommandLine(char *line) {
 	char *filename;	
 	char c;
 	int result;
+	int createOrAcl = 0;
 
 	while ((c = *line) != ' ') {
 		if (len > 6) {
@@ -1443,13 +1448,29 @@ int parseCommandLine(char *line) {
 
 	command[len] = '\0';
 
+	if (strcmp(command, "CREATE") != 0 || strcmp(command, "ACL") != 0) {
+		createOrAcl = 1;
+	}
+
 	line++;
 
 	line = getUsernameAndGroupname(line, &username, &groupname);
 
+	if (line == NULL) {
+		if (createOrAcl) {
+			ignoreRestOfAcl();
+		}
+
+		return C_INVALID;		
+	}
+
 	if (*line != ' ') {
-		return C_INVALID;
+		if (createOrAcl) {
+			ignoreRestOfAcl();
+		}
+
 		setError("You have to include a file name");
+		return C_INVALID;		
 	}
 
 	line++;
@@ -1457,7 +1478,7 @@ int parseCommandLine(char *line) {
 
 	// Error msg already set. 
 	if (line == NULL) {
-		if (strcmp(command, "CREATE") != 0 || strcmp(command, "ACL") != 0) {
+		if (createOrAcl) {
 			ignoreRestOfAcl();
 		}
 
