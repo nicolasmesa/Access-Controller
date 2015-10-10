@@ -65,6 +65,7 @@ static struct user_struct *usersHead = NULL;
 static struct group_struct *groupsHead = NULL;
 static struct error_struct error = {1, NULL};
 static char defaultErrorMsg[] = "Error with this entry";
+static int endOfInput = 0;
 
 
 void setError(char *msg) {
@@ -537,13 +538,10 @@ int validateOnlyLetter(char c) {
 	return 1;
 }
 
-char *getUsernameAndGroupname(char *userStart, char **username, char **groupname) {
+char *getUsername(char *userStart, char** username) {
 	char *line = userStart;
-	char *groupStart;
 	char c;
 	int len = 0;
-
-	//@todo *.group, user.*, *.*
 
 	// Get user name
 	while((c = *line) != '.') {
@@ -564,9 +562,13 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 
 	*username = strndup(userStart, len);	
 
-	len = 0;
-	line++;
-	groupStart = line;	
+	return line;
+}
+
+char *getGroupname(char *groupStart, char **groupname) {
+	char *line = groupStart;
+	char c;
+	int len = 0;	
 
 	// Get group name
 	while((c = *line) != ' ') {
@@ -574,8 +576,7 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 			break;
 		}
 
-		if (!validateOnlyLetter(c)) {
-			free(*username);
+		if (!validateOnlyLetter(c)) {			
 			setError("Invalid characters in the group name");
 			return NULL;
 		}
@@ -585,12 +586,80 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 	}
 
 	if (!len) {
-		free(*username);
 		setError("Empty string supplied for the group name");
 		return NULL;
 	}
 
 	*groupname = strndup(groupStart, len);
+
+	return line;
+}
+
+char *getUsernameAndGroupname(char *userStart, char **username, char **groupname) {
+	char *line = userStart;		
+
+	line = getUsername(line, username);
+
+	if (line == NULL) {
+		return NULL;
+	}	
+
+	line++;
+
+	line = getGroupname(line, groupname);
+
+	if (line == NULL) {
+		free(username);
+		return NULL;
+	}
+	
+
+	return line;
+}
+
+
+char *getUsernameAndGroupnameForAcl(char *userStart, char **username, char **groupname) {	
+	char *line = userStart;
+
+	if (*userStart == '*') {
+		*username = strdup("*");
+
+		if (username == NULL) {
+			printAndExit(NULL);
+		}
+
+		line++;
+	} else {
+		line = getUsername(line, username);
+
+		if (line == NULL) {
+			return NULL;
+		}		
+	}
+
+	if (*line != '.') {
+		setError("Expected . between username and groupname");
+		return NULL;
+	}
+
+	line++;
+
+
+	if(*line == '*') {
+		*groupname = strdup("*");
+
+		if (groupname == NULL) {
+			printAndExit(NULL);
+		}
+
+		line++;
+	} else {
+		line = getGroupname(line, groupname);
+
+		if (line == NULL) {
+			return NULL;
+		}
+	}
 
 	return line;
 }
@@ -636,6 +705,11 @@ int parseUserDefinitionLine(char *line) {
 
 	// An error ocurred
 	if (line == NULL) {
+		return U_INVALID;
+	}
+
+	if (*line == '\0') {
+		setError("Invalid input");
 		return U_INVALID;
 	}
 
@@ -744,7 +818,7 @@ char *getLine() {
 		printAndExit(NULL);
 	}
 
-	while ((c = getchar()) != '\0' && c != '\n') {
+	while ((c = getchar()) != EOF && c != '\n') {
 		line[index] = c;
 		index++;
 
@@ -752,6 +826,11 @@ char *getLine() {
 			len *= 2;
 			line = realloc(line, len);
 		}
+	}
+
+
+	if (c == EOF) {
+		endOfInput = 1;
 	}
 
 	line[index] = '\0';
@@ -797,6 +876,23 @@ int parseUserDefinitionSection() {
 	return 0;
 }
 
+void getPermissionsAsText(struct acl_entry *aclEntry, char permissions[3]) {
+	if (aclEntry->readPermission && aclEntry->writePermission) {
+		permissions[0] = 'r';
+		permissions[1] = 'w';
+		permissions[2] = '\0';
+	} else if(aclEntry->readPermission) {
+		permissions[0] = 'r';
+		permissions[1] = '\0';
+	} else if (aclEntry->writePermission) {
+		permissions[0] = 'w';
+		permissions[1] = '\0';
+	} else {
+		permissions[0] = '-';
+		permissions[1] = '\0';
+	}
+}
+
 
 void printAclForFile(struct file_struct *file) {
 	printf("ACL for file %s\n", file->cmpName);
@@ -822,20 +918,7 @@ void printAclForFile(struct file_struct *file) {
 			groupname = "*";
 		}
 
-		if (aclEntry->readPermission && aclEntry->writePermission) {
-			permissions[0] = 'r';
-			permissions[1] = 'w';
-			permissions[2] = '\0';
-		} else if(aclEntry->readPermission) {
-			permissions[0] = 'r';
-			permissions[1] = '\0';
-		} else if (aclEntry->writePermission) {
-			permissions[0] = 'w';
-			permissions[1] = '\0';
-		} else {
-			permissions[0] = '-';
-			permissions[1] = '\0';
-		}		
+		getPermissionsAsText(aclEntry, permissions);		
 
 		printf("\t%s.%s %s\n", username, groupname, permissions);
 	}
@@ -849,14 +932,193 @@ int userBelongsToGroup(struct user_struct *user, struct group_struct *group){
 	return 1;
 }
 
-void clearAclForFile(struct file_struct *file) {
-	struct acl_entry *aclEntry = file->aclHead;	
+char *getPermissions(char *line, char permissions[3]) {
 
+	// rw
+	if (strlen(line) == 2) {
+		if (line[0] != 'r' || line[1] != 'w') {
+			setError("Invalid permissions");
+			return NULL;
+		}
+
+		permissions[0] = 'r';
+		permissions[1] = 'w';
+		permissions[2] = '\0';
+
+		return (line + 2);
+	}
+
+	// r, w, -
+	if (strlen(line) == 1) {
+		if (*line != 'r' && *line != 'w' && *line != '-') {
+			setError("Invalid permissions");
+			return NULL;
+		}
+
+		permissions[0] = *line;
+		permissions[1] = '\0';
+		return (line + 1);
+	}
+
+	setError("Invalid permissions");
+	return NULL;
+}
+
+void clearAclList(struct acl_entry *aclEntryHead) {
+	struct acl_entry *aclEntry = aclEntryHead;
+		
 	while (aclEntry != NULL) {		
 		struct acl_entry *temp = aclEntry;
 		aclEntry = aclEntry->next;
 		free(temp);
+	}	
+}
+
+void ignoreRestOfAcl() {
+	while (1) {		
+		char *line = getLine();
+
+		if (strcmp(line, ".") == 0){
+			free(line);
+			break;
+		}
+
+		free(line);
 	}
+}
+
+int parseAclList(struct acl_entry **aclEntryHead, struct acl_entry **aclEntryTail) {
+	char *line;
+	char *username;
+	char *groupname;
+	char permissions[3];
+	struct user_struct *user;
+	struct group_struct *group;
+
+	*aclEntryHead = NULL;
+	*aclEntryTail = NULL;
+
+
+	while (1) {
+		line = getLine();
+		char *startOfLine = line;
+
+		if (strcmp(line, ".") == 0) {
+			free(startOfLine);
+			return C_YES;
+		}
+
+		line = getUsernameAndGroupnameForAcl(line, &username, &groupname);
+
+		if (line == NULL) {
+			free(startOfLine);
+			return C_INVALID;
+		}
+
+		if (strcmp(username, "*") == 0){
+			user = NULL;
+		} else {			
+			user = findUserByUsername(username);
+
+			if (user == NULL) {
+				setError("User does not exist");
+
+				free(startOfLine);
+				return C_INVALID;
+			}	
+		}
+
+		if (strcmp(groupname, "*") == 0) {
+			group = NULL;
+		} else {
+			group = findGroupByGroupname(groupname);
+
+			if (group == NULL) {
+				setError("Group does not exist");
+
+				free(startOfLine);
+				return C_INVALID;
+			}
+		}
+
+		// If both username and groupname were specified (no *), then
+		// we make sure that the user belongs to the group
+		if (strcmp(username, "*") != 0 && strcmp(groupname, "*") != 0) {
+			if (!userBelongsToGroup(user, group)) {
+				setError("User does not belong to group");
+				return C_INVALID;		
+			}
+		}
+
+		if (*line != ' ') {
+			setError("Missing permissions");
+			free(startOfLine);
+			return C_INVALID;
+		}
+
+		// Skip ' '
+		line++;
+
+		line = getPermissions(line, permissions);		
+
+		if (line == NULL) {
+			free(startOfLine);
+			return C_INVALID;
+		}
+
+		if (*aclEntryHead == NULL) {
+			*aclEntryHead = createAclEntry(permissions, user, group);
+			*aclEntryTail = *aclEntryHead;
+		} else {
+			(*aclEntryTail)->next = createAclEntry(permissions, user, group);
+			*aclEntryTail = (*aclEntryTail)->next;
+		}		
+
+		free(startOfLine);
+	}
+
+
+	return C_YES;
+}
+
+void clearAclForFile(struct file_struct *file) {
+	clearAclList(file->aclHead);
+}
+
+void copyAcl(struct file_struct *dst, struct file_struct *src) {	
+	clearAclForFile(dst);
+
+	struct acl_entry *srcAclEntry = src->aclHead;
+	struct acl_entry *dstAclEntry = NULL;
+	struct acl_entry *prev = NULL;
+	struct acl_entry *dstHead = NULL;	
+
+	while (srcAclEntry != NULL){
+		char permissions[3];
+
+		getPermissionsAsText(srcAclEntry, permissions);		
+
+		dstAclEntry = createAclEntry(permissions, srcAclEntry->user, srcAclEntry->group);		
+
+		if (dstAclEntry == NULL) {
+			printAndExit(NULL);
+		}
+
+		if (dstHead == NULL) {
+			dstHead = dstAclEntry;
+		}
+
+		if (prev != NULL) {
+			prev->next = dstAclEntry;
+		}
+
+		prev = dstAclEntry;
+		srcAclEntry = srcAclEntry->next;		
+	}	
+
+	dst->aclHead = dstHead;
+	dst->aclTail = dstAclEntry;
+
 }
 
 int executeRead(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
@@ -866,7 +1128,7 @@ int executeRead(struct user_struct *user, struct group_struct *group, struct fil
 		struct acl_entry *aclEntry = findAclByFileUserAndGroup(currentFile, user, group);
 
 		if (aclEntry == NULL || !aclEntry->readPermission) {
-			setError("No read permissions on path to file");		
+			setError("Can't read file");		
 			return C_NO;
 		}
 
@@ -893,14 +1155,149 @@ int executeWrite(struct user_struct *user, struct group_struct *group, struct fi
 	return executeRead(user, group, parentFile);
 }
 
+int executeAcl(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
+	int result;
+	struct acl_entry *aclEntryHead;
+	struct acl_entry *aclEntryTail;
+
+	result = executeWrite(user, group, file);
+
+	if (result != C_YES) {
+		return result;
+	}
+
+	result = parseAclList(&aclEntryHead, &aclEntryTail);
+
+	// Error already set
+	if (result != C_YES) {		
+		return result;
+	}
+
+	if (aclEntryHead == NULL || aclEntryTail == NULL) {
+		setError("The file can't have a NULL ACL");
+		return C_INVALID;
+	}
+
+	clearAclForFile(file);	
+
+	file->aclHead = aclEntryHead;
+	file->aclTail = aclEntryTail;
+
+	return C_YES;
+}
+
 int executeCreate(struct user_struct *user, struct group_struct *group, char *filename) {
-	setError("Execute create not implemented");
-	return C_INVALID;
+	char *fileLine = filename;
+	char *lastSlash = fileLine;
+	char *parentPath;	
+	char *cmpName;
+	int index = 0;
+	int result;
+	char c;
+	struct file_struct *parentFile;
+	struct file_struct *newFile;
+	struct acl_entry *aclEntryHead;
+	struct acl_entry *aclEntryTail;
+
+	if (*lastSlash != '/') {		
+		setError("File path must start with /");
+		return C_INVALID;
+	}
+
+	while ((c = *fileLine) != '\0') {
+		if (c == '/') {
+			lastSlash = fileLine;
+		}
+
+		fileLine++;
+	}
+
+	index = lastSlash - filename;
+
+	parentPath = strndup(filename, index);
+
+	if(parentPath == NULL) {
+		printAndExit(NULL);
+	}
+
+
+	lastSlash++;
+	cmpName = strdup(lastSlash);	
+
+	if (cmpName == NULL) {
+		printAndExit(NULL);
+	}
+
+
+	parentFile = findFileByPath(parentPath);
+
+	if (parentFile == NULL) {
+		setError("Parent file does not exist");
+
+		free(parentPath);
+		free(cmpName);
+
+		return C_INVALID;
+	}
+
+
+	result = executeWrite(user, group, parentFile);
+
+	if (result != C_YES) {		
+		free(parentPath);
+		free(cmpName);
+		return result;
+	}
+
+	if (findFileByPath(filename) != NULL) {
+		free(parentPath);
+		free(cmpName);
+
+		setError("File already exists");
+		return C_INVALID;
+	}
+
+	result = parseAclList(&aclEntryHead, &aclEntryTail);
+
+
+	if (result != C_YES) {
+		free(parentPath);
+		free(cmpName);	
+		clearAclList(aclEntryHead);
+
+		ignoreRestOfAcl();
+
+		return result;
+	}
+
+
+	newFile = createFile(cmpName, parentFile);
+
+	if (newFile == NULL) {		
+		free(parentPath);
+		free(cmpName);
+		return C_INVALID;
+	}
+
+	// If there was no ACL, inherit from parent directory
+	if (aclEntryHead == NULL) {
+		copyAcl(newFile, parentFile);		
+	} else {
+		newFile->aclHead = aclEntryHead;
+		newFile->aclTail = aclEntryTail;
+	}
+
+	free(parentPath);
+	free(cmpName);
+	
+
+	return C_YES;
 }
 
 int executeDelete(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
 	struct file_struct *parentFile = file->parent;
 	struct file_struct *window = parentFile->children;
+	int result;
 
 	if (file->children != NULL)	{
 		setError("Can't delete a file that has children");
@@ -913,9 +1310,12 @@ int executeDelete(struct user_struct *user, struct group_struct *group, struct f
 		return C_NO;
 	}
 
+
+	result = executeWrite(user, group, file);
+
 	// Can't write
-	if (executeWrite(user, group, file) == C_NO) {		
-		return C_NO;
+	if (result != C_YES) {		
+		return result;
 	}
 
 	if (window == file) {
@@ -934,11 +1334,6 @@ int executeDelete(struct user_struct *user, struct group_struct *group, struct f
 	free(file);
 
 	return C_YES;
-}
-
-int executeAcl(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
-	setError("Execute acl not implemented");
-	return C_INVALID;
 }
 
 int executeCommand(char *command, char *username, char *groupname, char *filename) {
@@ -1022,6 +1417,7 @@ int parseCommandLine(char *line) {
 	char *groupname;
 	char *filename;	
 	char c;
+	int result;
 
 	while ((c = *line) != ' ') {
 		if (len > 6) {
@@ -1054,7 +1450,13 @@ int parseCommandLine(char *line) {
 		return C_INVALID;
 	}
 
-	return executeCommand(command, username, groupname, filename);
+	result = executeCommand(command, username, groupname, filename);
+
+	free(username);
+	free(groupname);
+	free(filename);
+
+	return result;
 }
 
 void parseFileOpearationSection(){
@@ -1096,6 +1498,9 @@ int main(int argc, char *argv[]) {
 	initFs();
 	parseUserDefinitionSection();
 	parseFileOpearationSection();
+
+	struct file_struct *file = findFileByPath("/home/nicolas/new");
+	printAclForFile(file);
 
 	return 0;
 }

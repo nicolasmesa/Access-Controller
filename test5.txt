@@ -1,0 +1,32 @@
+nicolas.mesa /home/nicolas
+user.group /home/user
+.
+READ nicolas.mesa /home/nicolas
+READ user.group /home/user
+CREATE nicolas.mesa /home/nicolas/new
+.
+CREATE nicolas.mesa /home/nicolas/second
+nicolas.mesa rw
+user.group r
+.
+CREATE nicolas.mesa /home/nicolas/invalid
+nicolas.group rw
+.
+ACL nicolas.mesa /home/nicolas/new
+.
+ACL nicolas.mesa /home/nicolas/new
+nicolas.mesa r
+user.group rw
+.
+WRITE user.group /home/nicolas/new
+ACL nicolas.mesa /home/nicolas
+nicolas.mesa rw
+user.group rw
+.
+WRITE user.group /home/nicolas/new
+WRITE nicolas.mesa /home/nicolas/new
+ACL user.group /home/nicolas/new
+user.group rw
+*.mesa w
+.
+WRITE nicolas.mesa /home/nicolas/new
