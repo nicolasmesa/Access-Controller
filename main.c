@@ -72,11 +72,15 @@ static struct group_struct *groupsHead = NULL;
 static struct error_struct error = {1, NULL};
 static char defaultErrorMsg[] = "Error with this entry";
 static int endOfInput = 0;
+static int debugOn = 1;
 
+void dbg(char *msg) {
+	printf("%s\n", msg);
+}
 
 void setError(char *msg) {
 	if (error.read == 0) {
-		printf("Warning. Setting error without reading prior message (%s)\n", error.message);
+		dbg("Warning. Setting error without reading prior message");
 	}
 
 	error.read = 0;
@@ -85,7 +89,7 @@ void setError(char *msg) {
 
 char *getError(){
 	if (error.read) {
-		printf("Warning. Reading error twice (%s)\n", error.message);
+		dbg("Warning. Reading error twice (%s)\n");
 		return defaultErrorMsg;
 	}
 
@@ -151,7 +155,8 @@ struct file_struct *findFileInListByName(struct file_struct *file, char *cmpName
 int addChildFile(struct file_struct *parent, struct file_struct *child) {
     if (findFileInListByName(parent->children, child->cmpName)) {
     	// Shouldn't happen
-        printAndExit("Error: File name already exists");            
+        dbg("Error: File name already exists");
+        return;
     }
 
     child->next = parent->children;
@@ -190,11 +195,11 @@ struct file_struct *findFileByPath(char *pathStart) {
 	int last = 0;
 
 	if (!path) {
-		printAndExit("Undefined path");
+		dbg("Undefined path");
 	}
 
 	if (*path != '/') {
-		printAndExit("File path must start with /");
+		dbg("File path must start with /");
 	}
 
 	path++;
@@ -214,7 +219,7 @@ struct file_struct *findFileByPath(char *pathStart) {
 
 			if (cmpLength > MAX_CMP_SIZE) {
 				cmpName[MAX_CMP_SIZE] = '\0';
-				printAndExit("Component longer than allowed");
+				dbg("Component longer than allowed");
 			}
 		}
 
@@ -300,7 +305,7 @@ struct acl_entry *findAclByFileUserAndGroup(struct file_struct *file, struct use
 
 void addAclToFile(struct file_struct *file, char *permissions, struct user_struct *user, struct group_struct *group) {		
 	if (findAclByFileUserAndGroup(file, user, group)) {
-		printf("File already had ACL for that group and user\n");
+		dbg("File already had ACL for that group and user\n");
 		// Adding another entry for the same user and
 		// group doesn't make sense since the first one
 		// is the one that counts. 

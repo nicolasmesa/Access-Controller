@@ -1,3 +1,5 @@
 nicolas.mesa /home/long/path
 .
 READ nicolas.mesa /home/long/path
+CREATE nicolas.mesa /home/long/path/not/exist
+.
