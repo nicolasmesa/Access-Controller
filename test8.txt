@@ -1,0 +1,3 @@
+nicolas.mesa /home/long/path
+.
+READ nicolas.mesa /home/long/path

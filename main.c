@@ -205,6 +205,88 @@ struct file_struct *findFileByPath(char *pathStart) {
 	return currentFile;	
 }
 
+struct acl_entry *createAclEntry(char *permissions, struct user_struct *user, struct group_struct *group) {
+	int len = strlen(permissions);
+	struct acl_entry *aclEntry = malloc(sizeof(struct acl_entry));
+
+	if (aclEntry == NULL) {
+		printAndExit(NULL);
+	}
+
+	aclEntry->next = NULL;
+	aclEntry->group = group;
+	aclEntry->user = user;
+	aclEntry->readPermission = 0;
+	aclEntry->writePermission = 0;
+
+	if (len == 1) {
+		if (*permissions == 'r') {
+			aclEntry->readPermission = 1;
+		}
+
+		if (*permissions == 'w') {
+			aclEntry->writePermission = 1;
+		}
+	}
+
+	if (len == 2) {
+		aclEntry->readPermission = 1;
+		aclEntry->writePermission = 1;
+	}
+
+	return aclEntry;
+}
+
+int aclUserMatch(struct acl_entry *aclEntry, struct user_struct *user) {
+	if (aclEntry->user == NULL || aclEntry->user == user) {
+		return 1;
+	}
+
+	return 0;
+}
+
+
+int aclGroupMatch(struct acl_entry *aclEntry, struct group_struct *group) {
+	if (aclEntry->group == NULL || aclEntry->group == group) {
+		return 1;
+	}
+
+	return 0;
+}
+
+struct acl_entry *findAclByFileUserAndGroup(struct file_struct *file, struct user_struct *user, struct group_struct *group){
+	struct acl_entry *aclEntry;
+
+	for (aclEntry = file->aclHead; aclEntry != NULL; aclEntry = aclEntry->next) {
+		if (aclUserMatch(aclEntry, user) && aclGroupMatch(aclEntry, group)) {
+			return aclEntry;
+		}
+	}
+
+	return NULL;
+}
+
+void addAclToFile(struct file_struct *file, char *permissions, struct user_struct *user, struct group_struct *group) {		
+	if (findAclByFileUserAndGroup(file, user, group)) {
+		printf("File already had ACL for that group and user\n");
+		// Adding another entry for the same user and
+		// group doesn't make sense since the first one
+		// is the one that counts. 
+		// @todo validate this
+		return;
+	}
+
+	struct acl_entry *aclEntry = createAclEntry(permissions, user, group);
+
+	if (file->aclTail == NULL){
+		file->aclTail = file->aclHead = aclEntry;
+		return;
+	}
+
+	file->aclTail->next = aclEntry;
+	file->aclTail = aclEntry;
+}
+
 struct file_struct *addFileByPath(char *pathStart) {
 	char cmpName[MAX_CMP_SIZE + 1];	
 	char *path = pathStart;	
@@ -262,6 +344,11 @@ struct file_struct *addFileByPath(char *pathStart) {
 			currentFile = temp;			
 		} else {			
 			currentFile = createFile(cmpName, currentFile);
+
+			// Add *.* r ACL to files along the path
+			if (!last) {
+				addAclToFile(currentFile, "r", NULL, NULL);
+			}
 		}
 
 		if(last){
@@ -426,88 +513,6 @@ int addUserAndGroup(char *username, char *groupname) {
 	addUserToGroup(user, group);
 
 	return 0;
-}
-
-struct acl_entry *createAclEntry(char *permissions, struct user_struct *user, struct group_struct *group) {
-	int len = strlen(permissions);
-	struct acl_entry *aclEntry = malloc(sizeof(struct acl_entry));
-
-	if (aclEntry == NULL) {
-		printAndExit(NULL);
-	}
-
-	aclEntry->next = NULL;
-	aclEntry->group = group;
-	aclEntry->user = user;
-	aclEntry->readPermission = 0;
-	aclEntry->writePermission = 0;
-
-	if (len == 1) {
-		if (*permissions == 'r') {
-			aclEntry->readPermission = 1;
-		}
-
-		if (*permissions == 'w') {
-			aclEntry->writePermission = 1;
-		}
-	}
-
-	if (len == 2) {
-		aclEntry->readPermission = 1;
-		aclEntry->writePermission = 1;
-	}
-
-	return aclEntry;
-}
-
-int aclUserMatch(struct acl_entry *aclEntry, struct user_struct *user) {
-	if (aclEntry->user == NULL || aclEntry->user == user) {
-		return 1;
-	}
-
-	return 0;
-}
-
-
-int aclGroupMatch(struct acl_entry *aclEntry, struct group_struct *group) {
-	if (aclEntry->group == NULL || aclEntry->group == group) {
-		return 1;
-	}
-
-	return 0;
-}
-
-struct acl_entry *findAclByFileUserAndGroup(struct file_struct *file, struct user_struct *user, struct group_struct *group){
-	struct acl_entry *aclEntry;
-
-	for (aclEntry = file->aclHead; aclEntry != NULL; aclEntry = aclEntry->next) {
-		if (aclUserMatch(aclEntry, user) && aclGroupMatch(aclEntry, group)) {
-			return aclEntry;
-		}
-	}
-
-	return NULL;
-}
-
-void addAclToFile(struct file_struct *file, char *permissions, struct user_struct *user, struct group_struct *group) {		
-	if (findAclByFileUserAndGroup(file, user, group)) {
-		printf("File already had ACL for that group and user\n");
-		// Adding another entry for the same user and
-		// group doesn't make sense since the first one
-		// is the one that counts. 
-		// @todo validate this
-		return;
-	}
-
-	struct acl_entry *aclEntry = createAclEntry(permissions, user, group);
-
-	if (file->aclTail == NULL){
-		file->aclTail = file->aclHead = aclEntry;
-		return;
-	}
-
-	file->aclTail->next = aclEntry;
-	file->aclTail = aclEntry;
 }
 
 int validateOnlyLetter(char c) {
@@ -839,6 +844,20 @@ char *getLine() {
 	return returnLine;
 }
 
+void addReadPermissionToUserFiles() {
+	struct user_struct *window = usersHead;
+
+	while (window != NULL) {
+		struct file_struct *file = window->file;
+
+		if (file != NULL) {
+			addAclToFile(file, "r", NULL, NULL);
+		}
+
+		window = window->next;
+	}
+}
+
 int parseUserDefinitionSection() {
 	char *line;
 	int num = 1;
@@ -871,6 +890,8 @@ int parseUserDefinitionSection() {
 
 		free(line);
 	}
+
+	addReadPermissionToUserFiles();
 
 	return 0;
 }
@@ -1529,6 +1550,6 @@ int main(int argc, char *argv[]) {
 	initFs();
 	parseUserDefinitionSection();
 	parseFileOpearationSection();
-
+	
 	return 0;
 }
