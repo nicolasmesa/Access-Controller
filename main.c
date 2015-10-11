@@ -75,7 +75,9 @@ static int endOfInput = 0;
 static int debugOn = 1;
 
 void dbg(char *msg) {
-	printf("%s\n", msg);
+	if (debugOn) {
+		printf("%s\n", msg);
+	}
 }
 
 void setError(char *msg) {
@@ -156,7 +158,7 @@ int addChildFile(struct file_struct *parent, struct file_struct *child) {
     if (findFileInListByName(parent->children, child->cmpName)) {
     	// Shouldn't happen
         dbg("Error: File name already exists");
-        return;
+        return 1;
     }
 
     child->next = parent->children;
