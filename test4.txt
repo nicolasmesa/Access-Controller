@@ -3,6 +3,8 @@ user.group /home/user
 double.slash /home//double
 letters.periods /home/n4
 existing.file /home/nicolas
+long.name /home/long/componentnamemeansthisshouldfail
+long.name /home/long
 .
 READ user.group /home/nicolas
 WRITE nicolas.student /

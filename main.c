@@ -102,6 +102,38 @@ void printAndExit(char *msg) {
 	exit(1);
 }
 
+int validateOnlyLetter(char c) {
+	if (c < 'a' || c > 'z') {
+		return 0;
+	}
+
+	return 1;
+}
+
+int validateOnlyUpperCaseLetter(char c) {
+	if (c < 'A' || c > 'Z') {
+		return 0;
+	}
+
+	return 1;
+}
+
+int validateFileChar(char c) {	
+	if (validateOnlyLetter(c)) {
+		return 1;
+	}
+
+	if (validateOnlyUpperCaseLetter(c)) {
+		return 1;
+	}
+
+	if (c == '.' || c == '/') {
+		return 1;
+	}
+
+	return 0;
+}
+
 struct file_struct *findFileInListByName(struct file_struct *file, char *cmpName) {
 	struct file_struct *curr = file;
 
@@ -287,6 +319,47 @@ void addAclToFile(struct file_struct *file, char *permissions, struct user_struc
 	file->aclTail = aclEntry;
 }
 
+int validateFilePath(char *path) {
+	int last = 0;
+	int cmpLength = 0;
+
+	while (*path != '\0') {
+		if (!validateFileChar(*path)) {
+			setError("Invalid characters in the file name");
+			return 0;
+		}
+		
+		while (*path != '/') {
+			if (*path == '\0') {
+				last = 1;				
+				break;
+			}
+			
+			cmpLength++;
+			path++;
+
+			if (cmpLength > MAX_CMP_SIZE) {			
+				setError("Component longer than allowed");
+				return 0;
+			}
+		}
+
+		if(last){
+			break;
+		}
+
+		cmpLength = 0;
+		path++;
+	}
+
+	if (cmpLength == 0) {
+		setError("Can't end file path in a /");
+		return 0;
+	}
+
+	return 1;
+}
+
 struct file_struct *addFileByPath(char *pathStart) {
 	char cmpName[MAX_CMP_SIZE + 1];	
 	char *path = pathStart;	
@@ -306,6 +379,10 @@ struct file_struct *addFileByPath(char *pathStart) {
 
 	if (strlen(path) > MAX_FILE_NAME_SIZE) {
 		setError("File name exceeds max file name size");
+		return NULL;
+	}
+
+	if (!validateFilePath(pathStart)) {
 		return NULL;
 	}
 
@@ -515,14 +592,6 @@ int addUserAndGroup(char *username, char *groupname) {
 	return 0;
 }
 
-int validateOnlyLetter(char c) {
-	if (c < 'a' || c > 'z') {
-		return 0;
-	}
-
-	return 1;
-}
-
 char *getUsername(char *userStart, char **username) {
 	char *line = userStart;
 	char c;
@@ -665,7 +734,7 @@ char *getFilepath(char *line, char **filePath) {
 	// Get file
 	while((c = *line) != '\0') {
 
-		if (c != '/' && c != '.' && !validateOnlyLetter(c)) {
+		if (!validateFileChar(c)) {
 			setError("Invalid characters in the file name");
 			return NULL;
 		}		

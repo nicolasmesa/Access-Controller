@@ -1,0 +1,6 @@
+
+Bad.username /home/bad
+bad.Group /home/bad
+bad.file /home/bad file
+bad.file /home/bad/
+.
