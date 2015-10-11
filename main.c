@@ -1,3 +1,9 @@
+/*
+ * I chose to allow modifications to the permissions of /tmp.
+ * /home doesn't allow this since no user will have write permissions
+ * on it so it is not possible to execute the ACL command on it.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1024,34 +1030,24 @@ int parseAclList(struct acl_entry **aclEntryHead, struct acl_entry **aclEntryTai
 		} else {			
 			user = findUserByUsername(username);
 
-			if (user == NULL) {
-				setError("User does not exist");
-
-				free(startOfLine);
-				return C_INVALID;
+			if (user == NULL) {				
+				user = createUser(username);
 			}	
 		}
 
 		if (strcmp(groupname, "*") == 0) {
 			group = NULL;
 		} else {
-			group = findGroupByGroupname(groupname);
+			group = findGroupByGroupname(groupname);			
 
 			if (group == NULL) {
-				setError("Group does not exist");
-
-				free(startOfLine);
-				return C_INVALID;
-			}
+				group = createGroup(groupname);
+			}			
 		}
 
-		// If both username and groupname were specified (no *), then
-		// we make sure that the user belongs to the group
-		if (strcmp(username, "*") != 0 && strcmp(groupname, "*") != 0) {
-			if (!userBelongsToGroup(user, group)) {
-				setError("User does not belong to group");
-				return C_INVALID;		
-			}
+		// Add user to group if necessary
+		if (user != NULL && group != NULL) {
+			addUserToGroup(user, group);
 		}
 
 		if (*line != ' ') {
@@ -1412,7 +1408,7 @@ int executeCommand(char *command, char *username, char *groupname, char *filenam
 	if (strcmp(command, "ACL") == 0) {		
 		if (file == NULL) {
 			setError("File does not exist");
-			
+
 			ignoreRestOfAcl();
 			return C_INVALID;
 		}
