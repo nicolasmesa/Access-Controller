@@ -29,7 +29,7 @@ user.columbia rw
 The third line is very similar to the first one. In this case, a new user ("nicolas") is cresated and a new group ("mesa") is also created. The user is added to the respective group and the file "/home/nicolas" is created with the following ACL:
 nicolas.mesa rw
 
-The line containing the dot (".") denotes the end of the user definition section. When this point is reached, an additional ACL entry is created for all of the files created levaing the following ACLs as a result:
+The line containing the dot (".") denotes the end of the user definition section. When this point is reached, an additional ACL entry is created for all of the files created leaving the following ACLs as a result:
 "/home/user"
   user.group rw
   user.columbia rw
@@ -73,7 +73,7 @@ WRITE nicolas.mesa /home/nicolas
 
 
 CREATE
-After the general verification, this command verifies that the file does not exist. It also makes sure that the parent of the file to be create does exist. Then it will make sure that the user and group have write permissions on the parent directory of the file to be created (involving checking if the whole path to the parent directory is readable). The the ACL is read and appended to the created file. If a user or group don't exist, they are created and the user is inserted into the group.
+After the general verification, this command verifies that the file does not exist. It also makes sure that the parent of the file to be created does exist. Then it will make sure that the user and group have write permissions on the parent directory of the file to be created (involving checking if the whole path to the parent directory is readable). The ACL is read and appended to the created file. If a user or group doesn’t exist, they are created and the user is inserted into the group.
 
 Sample
 CREATE nicolas.mesa /home/nicolas/sample
@@ -83,7 +83,7 @@ newuser.newgroup r
 .
 
 ACL
-After the general verification, this command verifies that the file exists. The it will make sure that the user and group have write permissions on the file  (involving checking if the whole path to the parent directory is readable). After this, the ACL is read overwriting the previous ACL of the file. If a user or a group don't exist, they are created and the user is inserted into the group.
+After the general verification, this command verifies that the file exists. Then it will make sure that the user and group have write permissions on the file  (involving checking if the whole path to the parent directory is readable). After this, the ACL is read overwriting the previous ACL of the file. If a user or a group doesn’t exist, they are created and the user is inserted into the group.
 
 Sample
 ACL nicolas.mesa /home/nicolas/sample
@@ -136,3 +136,4 @@ Whole sample (output):
 
 
 To execute the command just save the input into a file such as "file.txt" and then call the command "make exec < file.txt".
+
