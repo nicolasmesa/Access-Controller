@@ -1542,8 +1542,7 @@ int executeCreate(struct user_struct *user, struct group_struct *group,
 
   if (*lastSlash != '/') {
     setError("File path must start with /");
-
-    ignoreRestOfAcl();
+    
     return C_INVALID;
   }
 
@@ -1576,8 +1575,7 @@ int executeCreate(struct user_struct *user, struct group_struct *group,
     setError("Parent file does not exist");
 
     free(parentPath);
-    free(cmpName);
-    ignoreRestOfAcl();
+    free(cmpName);    
 
     return C_INVALID;
   }
@@ -1587,8 +1585,7 @@ int executeCreate(struct user_struct *user, struct group_struct *group,
   if (result != C_YES) {
     free(parentPath);
     free(cmpName);
-
-    ignoreRestOfAcl();
+    
     return result;
   }
 
@@ -1596,8 +1593,7 @@ int executeCreate(struct user_struct *user, struct group_struct *group,
     free(parentPath);
     free(cmpName);
 
-    setError("File already exists");
-    ignoreRestOfAcl();
+    setError("File already exists");    
     return C_INVALID;
   }
 
@@ -1607,8 +1603,6 @@ int executeCreate(struct user_struct *user, struct group_struct *group,
     free(parentPath);
     free(cmpName);
     clearAclList(aclEntryHead);
-
-    ignoreRestOfAcl();
 
     return result;
   }
@@ -1686,6 +1680,7 @@ int executeDelete(struct user_struct *user, struct group_struct *group,
   return C_YES;
 }
 
+
 /**
  * Performs checks on the input and calls the appropriate command
  * Returns
@@ -1735,8 +1730,7 @@ int executeCommand(char *command, char *username, char *groupname,
   if (strcmp(command, "CREATE") == 0) {
     if (file != NULL) {
       setError("File already exists");
-
-      ignoreRestOfAcl();
+      
       return C_INVALID;
     }
 
@@ -1756,7 +1750,6 @@ int executeCommand(char *command, char *username, char *groupname,
     if (file == NULL) {
       setError("File does not exist");
 
-      ignoreRestOfAcl();
       return C_INVALID;
     }
 
@@ -1795,7 +1788,7 @@ int parseCommandLine(char *line) {
 
   command[len] = '\0';
 
-  if (strcmp(command, "CREATE") != 0 || strcmp(command, "ACL") != 0) {
+  if (strcmp(command, "CREATE") == 0 || strcmp(command, "ACL") == 0) {  	
     createOrAcl = 1;
   }
 
@@ -1833,6 +1826,10 @@ int parseCommandLine(char *line) {
   }
 
   result = executeCommand(command, username, groupname, filename);
+
+  if (result != C_YES && createOrAcl) {  	  
+    ignoreRestOfAcl();
+  }
 
   free(username);
   free(groupname);

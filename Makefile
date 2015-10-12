@@ -26,6 +26,12 @@ test:	build
 	./acl_checker < test8.txt
 	@echo "------------"
 	./acl_checker < test9.txt
+	@echo "------------"
+	./acl_checker < test10.txt
+	@echo "------------"
+	./acl_checker < test11.txt
+	@echo "------------"
+	./acl_checker < test12.txt
 
 exec: build
 	./acl_checker $(ARG)

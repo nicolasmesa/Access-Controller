@@ -5,7 +5,7 @@ userc.groupc /home/verylongcomponentshouldfail/ihope
 userd.groupd /home
 .mesa /home/invalid
 invalid1.group /home/number
-.mesa /home/invalid
+nicolas. /home/invalid
 invalid.group1 /home/number
 nicolas. /home/invalid
 nicolas.mesa
