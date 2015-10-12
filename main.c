@@ -20,6 +20,8 @@
 #define C_NO 1
 #define C_INVALID 2
 
+#define DEBUGGING 0
+
 struct file_struct {
   struct file_struct *next;
   struct file_struct *parent;
@@ -71,14 +73,13 @@ static struct group_struct *groupsHead = NULL;
 static struct error_struct error = {1, NULL};
 static char defaultErrorMsg[] = "Error with this entry";
 static int endOfInput = 0;
-static int debugOn = 1;
 
 /**
  * Function to print debugging messages only if it is in the debugging
  * environmnent
  */
 void dbg(char *msg) {
-  if (debugOn) {
+  if (DEBUGGING) {
     printf("%s\n", msg);
   }
 }
