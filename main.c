@@ -74,12 +74,20 @@ static char defaultErrorMsg[] = "Error with this entry";
 static int endOfInput = 0;
 static int debugOn = 1;
 
+/**
+ * Function to print debugging messages only if it is in the debugging 
+ * environmnent
+ */
 void dbg(char *msg) {
 	if (debugOn) {
 		printf("%s\n", msg);
 	}
 }
 
+/**
+ * Sets the error message t the global error struct and 
+ * unsets the read flag.
+ */
 void setError(char *msg) {
 	if (error.read == 0) {
 		dbg("Warning. Setting error without reading prior message");
@@ -89,6 +97,11 @@ void setError(char *msg) {
 	error.message = strdup(msg);
 }
 
+/**
+ * Gets the error from the global error struct and 
+ * sets the read flag. If the error message was 
+ * already read, a default message is returned instead
+ */
 char *getError(){
 	if (error.read) {
 		dbg("Warning. Reading error twice (%s)\n");
@@ -99,6 +112,11 @@ char *getError(){
 	return error.message;
 }
 
+/**
+ * Prints an error message if it is passed. It NULL is 
+ * passed instead, the strerror for errno is printed. 
+ * After that, the program exits
+ */
 void printAndExit(char *msg) {
 	if (msg == NULL) {
 		msg = strerror(errno);
@@ -108,6 +126,9 @@ void printAndExit(char *msg) {
 	exit(1);
 }
 
+/**
+ * Validate that the character is a lowercase letter
+ */
 int validateOnlyLetter(char c) {
 	if (c < 'a' || c > 'z') {
 		return 0;
@@ -116,6 +137,10 @@ int validateOnlyLetter(char c) {
 	return 1;
 }
 
+/**
+ * Validates that the character is an uppercase
+ * letter
+ */
 int validateOnlyUpperCaseLetter(char c) {
 	if (c < 'A' || c > 'Z') {
 		return 0;
@@ -124,6 +149,10 @@ int validateOnlyUpperCaseLetter(char c) {
 	return 1;
 }
 
+/**
+ * Validates if a character is valid in 
+ * a file name
+ */
 int validateFileChar(char c) {	
 	if (validateOnlyLetter(c)) {
 		return 1;
@@ -140,6 +169,10 @@ int validateFileChar(char c) {
 	return 0;
 }
 
+/**
+ * Searches through a file list looking for the filename.
+ * The file is returned if it exist, NULL is returned otherwise
+ */
 struct file_struct *findFileInListByName(struct file_struct *file, char *cmpName) {
 	struct file_struct *curr = file;
 
@@ -154,6 +187,9 @@ struct file_struct *findFileInListByName(struct file_struct *file, char *cmpName
 	return NULL;
 }
 
+/**
+ * Adds a file to the list of children of the parent
+ */
 int addChildFile(struct file_struct *parent, struct file_struct *child) {
     if (findFileInListByName(parent->children, child->cmpName)) {
     	// Shouldn't happen
@@ -167,6 +203,11 @@ int addChildFile(struct file_struct *parent, struct file_struct *child) {
 	return 0;
 }
 
+/**
+ * Creates a file and appends it to the children of the parent.
+ * The caller is responsible for making sure that the file doesn't
+ * exist
+ */
 struct file_struct *createFile(char *cmpName, struct file_struct *parent) {
 	struct file_struct *file = malloc(sizeof(struct file_struct));
 
@@ -190,18 +231,74 @@ struct file_struct *createFile(char *cmpName, struct file_struct *parent) {
 	return file;
 }
 
+/**
+ * Checks the file path for errors. If it doesn't find errors
+ * returns 1. 0 is returned otherwise
+ */
+int validateFilePath(char *path) {
+	int last = 0;
+	int cmpLength = 0;
+
+	if (!path) {
+		setError("Undefined file path");
+		return 0;
+	}
+
+	if (*path != '/') {
+		setError("File path must start with /");
+		return 0;
+	}
+
+	while (*path != '\0') {
+		if (!validateFileChar(*path)) {
+			setError("Invalid characters in the file name");
+			return 0;
+		}
+		
+		while (*path != '/') {
+			if (*path == '\0') {
+				last = 1;				
+				break;
+			}
+			
+			cmpLength++;
+			path++;
+
+			if (cmpLength > MAX_CMP_SIZE) {			
+				setError("Component longer than allowed");
+				return 0;
+			}
+		}
+
+		if(last){
+			break;
+		}
+
+		cmpLength = 0;
+		path++;
+	}
+
+	if (cmpLength == 0) {
+		setError("Can't end file path in a /");
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * Performs validation on the file and returns the file
+ * if it exists. NULL is returned if there is an error or
+ * if the file doesn't exist
+ */
 struct file_struct *findFileByPath(char *pathStart) {
 	char cmpName[MAX_CMP_SIZE + 1];	
 	char *path = pathStart;	
 	struct file_struct *currentFile = root;
 	int last = 0;
 
-	if (!path) {
-		dbg("Undefined path");
-	}
-
-	if (*path != '/') {
-		dbg("File path must start with /");
+	if (!validateFilePath(pathStart)) {
+		return NULL;
 	}
 
 	path++;
@@ -244,6 +341,10 @@ struct file_struct *findFileByPath(char *pathStart) {
 	return currentFile;	
 }
 
+/**
+ * Creates the ACL entry with the specified permissions. The called is responsible for freeing the 
+ * memory if needed.
+ */
 struct acl_entry *createAclEntry(char *permissions, struct user_struct *user, struct group_struct *group) {
 	int len = strlen(permissions);
 	struct acl_entry *aclEntry = malloc(sizeof(struct acl_entry));
@@ -276,7 +377,12 @@ struct acl_entry *createAclEntry(char *permissions, struct user_struct *user, st
 	return aclEntry;
 }
 
+/**
+ * Matches an ACL entry against a user to see if it matches.
+ * Returns 1 if it is a match, 0 otherwise
+ */
 int aclUserMatch(struct acl_entry *aclEntry, struct user_struct *user) {
+	// User being NULL is the same as "*" so it matches anything
 	if (aclEntry->user == NULL || aclEntry->user == user) {
 		return 1;
 	}
@@ -284,8 +390,12 @@ int aclUserMatch(struct acl_entry *aclEntry, struct user_struct *user) {
 	return 0;
 }
 
-
+/**
+ * Matches an ACL entry against a group to see if it matches. 
+ * Returns 1 if it is a match, 0 otherwise
+ */
 int aclGroupMatch(struct acl_entry *aclEntry, struct group_struct *group) {
+	// Group being NULL is the same as "*" so it matches anything
 	if (aclEntry->group == NULL || aclEntry->group == group) {
 		return 1;
 	}
@@ -293,6 +403,10 @@ int aclGroupMatch(struct acl_entry *aclEntry, struct group_struct *group) {
 	return 0;
 }
 
+/**
+ * Finds the ACL entry for a file that matches both the user and the group.
+ * The ACL entry is returned if found, NULL is returned otherwise
+ */
 struct acl_entry *findAclByFileUserAndGroup(struct file_struct *file, struct user_struct *user, struct group_struct *group){
 	struct acl_entry *aclEntry;
 
@@ -305,14 +419,12 @@ struct acl_entry *findAclByFileUserAndGroup(struct file_struct *file, struct use
 	return NULL;
 }
 
+/**
+ * Adds ACL to the acl list of a file
+ */
 void addAclToFile(struct file_struct *file, char *permissions, struct user_struct *user, struct group_struct *group) {		
 	if (findAclByFileUserAndGroup(file, user, group)) {
 		dbg("File already had ACL for that group and user\n");
-		// Adding another entry for the same user and
-		// group doesn't make sense since the first one
-		// is the one that counts. 
-		// @todo validate this
-		return;
 	}
 
 	struct acl_entry *aclEntry = createAclEntry(permissions, user, group);
@@ -326,47 +438,12 @@ void addAclToFile(struct file_struct *file, char *permissions, struct user_struc
 	file->aclTail = aclEntry;
 }
 
-int validateFilePath(char *path) {
-	int last = 0;
-	int cmpLength = 0;
-
-	while (*path != '\0') {
-		if (!validateFileChar(*path)) {
-			setError("Invalid characters in the file name");
-			return 0;
-		}
-		
-		while (*path != '/') {
-			if (*path == '\0') {
-				last = 1;				
-				break;
-			}
-			
-			cmpLength++;
-			path++;
-
-			if (cmpLength > MAX_CMP_SIZE) {			
-				setError("Component longer than allowed");
-				return 0;
-			}
-		}
-
-		if(last){
-			break;
-		}
-
-		cmpLength = 0;
-		path++;
-	}
-
-	if (cmpLength == 0) {
-		setError("Can't end file path in a /");
-		return 0;
-	}
-
-	return 1;
-}
-
+/**
+ * Validates the file path. Then starts going component by 
+ * component verifying if it exists and if it doesn't, it creates
+ * it. Returns the last created file if there was no error. NULL
+ * is returned otherwise
+ */
 struct file_struct *addFileByPath(char *pathStart) {
 	char cmpName[MAX_CMP_SIZE + 1];	
 	char *path = pathStart;	
@@ -445,6 +522,10 @@ struct file_struct *addFileByPath(char *pathStart) {
 	return currentFile;	
 }
 
+/**
+ * Searches the user list for a user matching the username. The
+ * user is returned if found, NULL is returned otherwise.
+ */
 struct user_struct *findUserByUsername(char *username) {
 	struct user_struct *window = usersHead;
 
@@ -459,6 +540,10 @@ struct user_struct *findUserByUsername(char *username) {
 	return NULL;
 }
 
+/**
+ * Searches the group list for a group matching the groupname. The 
+ * group is returned if found, NULL is returned otherwise.
+ */
 struct group_struct *findGroupByGroupname(char *groupname) {
 	struct group_struct *window = groupsHead;
 
@@ -473,6 +558,10 @@ struct group_struct *findGroupByGroupname(char *groupname) {
 	return NULL;
 }
 
+/**
+ * Creates a user if it doesn't exist. The called should make 
+ * sure the user doesn't exist before calling this function
+ */
 struct user_struct *createUser(char *username) {
 	struct user_struct *user = findUserByUsername(username);
 
@@ -497,6 +586,11 @@ struct user_struct *createUser(char *username) {
 	return user;		
 }
 
+/**
+ * Creats a group if it doesn't exist. The caller should
+ * make sure the group doesn't exist before calling this 
+ * function
+ */
 struct group_struct *createGroup(char *groupname) {
 	struct group_struct *group = findGroupByGroupname(groupname);
 
@@ -519,6 +613,10 @@ struct group_struct *createGroup(char *groupname) {
 	return group;		
 }
 
+/**
+ * Finds a group in the list of groups in the user. Returns the group if it
+ * finds it, NULL otherwise
+ */
 struct group_struct *findUserGroup(struct user_struct *user, char *groupname) {
 	struct user_group_list *userGroupContainer = user->groups;
 
@@ -535,6 +633,10 @@ struct group_struct *findUserGroup(struct user_struct *user, char *groupname) {
 	return NULL;
 }
 
+/**
+ * Finds a user inside a group if it exists, returns the user,
+ * NULL is returned otherwise
+ */
 struct user_struct *findGroupUser(struct group_struct *group, char *username) {
 	struct group_user_list *groupUserContainer = group->users;
 
@@ -551,6 +653,10 @@ struct user_struct *findGroupUser(struct group_struct *group, char *username) {
 	return NULL;
 }
 
+/**
+ * Adds the user to the list in the group and adds the 
+ * group to the list of groups for the user (if necessary).
+ */
 void addUserToGroup(struct user_struct *user, struct group_struct *group) {
 	struct group_struct *userGroup = findUserGroup(user, group->groupname);
 	struct user_struct *groupUser = findGroupUser(group, user->username);
@@ -581,6 +687,10 @@ void addUserToGroup(struct user_struct *user, struct group_struct *group) {
 	}
 }
 
+/**
+ * Creates the user and group if they don't exist. Then adds
+ * the user to the group.
+ */
 int addUserAndGroup(char *username, char *groupname) {
 	struct user_struct *user = findUserByUsername(username);
 	struct group_struct *group = findGroupByGroupname(groupname);
@@ -599,6 +709,11 @@ int addUserAndGroup(char *username, char *groupname) {
 	return 0;
 }
 
+/**
+ * Gets the username from the line. The caller is responsible 
+ * for freeing the memory in *username.
+ * Returns the position after the username ends (should be ""*)
+ */
 char *getUsername(char *userStart, char **username) {
 	char *line = userStart;
 	char c;
@@ -626,6 +741,11 @@ char *getUsername(char *userStart, char **username) {
 	return line;
 }
 
+/**
+ * Gets the groupname from the line. The caller is responsible for
+ * freeing the memory in *groupname
+ * Returns the position after the groupname ends
+ */
 char *getGroupname(char *groupStart, char **groupname) {
 	char *line = groupStart;
 	char c;
@@ -656,6 +776,11 @@ char *getGroupname(char *groupStart, char **groupname) {
 	return line;
 }
 
+/**
+ * Gets username and groupname from the line. The caller is 
+ * responsible for freeing the memory for the *username and *groupname
+ * Returns the position of the line after the groupname ends
+ */
 char *getUsernameAndGroupname(char *userStart, char **username, char **groupname) {
 	char *line = userStart;		
 
@@ -678,7 +803,11 @@ char *getUsernameAndGroupname(char *userStart, char **username, char **groupname
 	return line;
 }
 
-
+/**
+ * Gets the username and groupname. It is different from
+ * getUsernameAndGroupname that it allows username and 
+ * groupname to be "*"
+ */
 char *getUsernameAndGroupnameForAcl(char *userStart, char **username, char **groupname) {	
 	char *line = userStart;
 
@@ -725,6 +854,13 @@ char *getUsernameAndGroupnameForAcl(char *userStart, char **username, char **gro
 	return line;
 }
 
+/**
+ * Extracts the file path from the line and puts it
+ * in filePath. The caller is responsible for freeing
+ * *filePath.
+ * Returns the position where the filePath ends or
+ * NULL if there was an error.
+ */
 char *getFilepath(char *line, char **filePath) {
 	int len = 0;	
 	char *filePathStart = line;	
@@ -769,6 +905,13 @@ char *getFilepath(char *line, char **filePath) {
 	return line;	
 }
 
+/**
+ * Gets user, group and file from the line, validates 
+ * them and creates them, if necessary.
+ * Returns
+ *	U_VALID If the line is valid
+ * 	U_INVALID If the line was not valid
+ */
 int parseUserDefinitionLine(char *line) {	
 	char *filePathStart;
 	char *fileName = NULL;
@@ -868,6 +1011,10 @@ int parseUserDefinitionLine(char *line) {
 	return U_VALID;
 }
 
+/**
+ * Creates the root folder along with /tmp and /home and
+ * gives them the ACL
+ */
 int initFs() {
 	root = createFile("/", NULL);
 
@@ -881,6 +1028,11 @@ int initFs() {
 	return 0;
 }
 
+/**
+ * Gets a line from STDIN. The caller is responsible for 
+ * freeing the memory of the line. If it reaches the end 
+ * of input, the endOfInput global variable is set
+ */
 char *getLine() {
 	int len = INITIAL_LINE_SIZE;
 	int index = 0;
@@ -920,6 +1072,12 @@ char *getLine() {
 	return returnLine;
 }
 
+/**
+ * Goes through all the files belonging to users adding
+ * read permissions for everybody at the end of the ACL.
+ * This is done to allow another user to own a file inside 
+ * another user's file
+ */
 void addReadPermissionToUserFiles() {
 	struct user_struct *window = usersHead;
 
@@ -934,6 +1092,12 @@ void addReadPermissionToUserFiles() {
 	}
 }
 
+/**
+ * Parses the user definition section line by line and 
+ * initializes the users, groups and files. This
+ * function runs until a single line with a "." is found
+ * denoting the end of the user definition section
+ */
 int parseUserDefinitionSection() {
 	char *line;
 	int num = 1;
@@ -972,6 +1136,10 @@ int parseUserDefinitionSection() {
 	return 0;
 }
 
+/**
+ * Gets the permissions from the ACL entry and makes them into
+ * text
+ */
 void getPermissionsAsText(struct acl_entry *aclEntry, char permissions[3]) {
 	if (aclEntry->readPermission && aclEntry->writePermission) {
 		permissions[0] = 'r';
@@ -989,7 +1157,10 @@ void getPermissionsAsText(struct acl_entry *aclEntry, char permissions[3]) {
 	}
 }
 
-
+/**
+ * Prints the whole ACL for a file. It is especially
+ * useful for debugging purposes 
+ */
 void printAclForFile(struct file_struct *file) {
 	printf("ACL for file %s\n", file->cmpName);
 	struct acl_entry *aclEntry;
@@ -1020,6 +1191,11 @@ void printAclForFile(struct file_struct *file) {
 	}
 }
 
+/**
+ * Goes through the the users in the group to check if it 
+ * has a user.
+ * Returns 1 if the user belongs to the group, 0 otherwise
+ */
 int userBelongsToGroup(struct user_struct *user, struct group_struct *group){
 	if (findGroupUser(group, user->username) == NULL) {
 		return 0;
@@ -1028,8 +1204,12 @@ int userBelongsToGroup(struct user_struct *user, struct group_struct *group){
 	return 1;
 }
 
+/**
+ * Gets the permissions string from the line while validating.
+ * It either returns the new position of the line after the 
+ * permissions string, or NULL if an error is found.
+ */
 char *getPermissions(char *line, char permissions[3]) {
-
 	// rw
 	if (strlen(line) == 2) {
 		if (line[0] != 'r' || line[1] != 'w') {
@@ -1060,6 +1240,9 @@ char *getPermissions(char *line, char permissions[3]) {
 	return NULL;
 }
 
+/**
+ * Clears the ACL list and frees the memory
+ */
 void clearAclList(struct acl_entry *aclEntryHead) {
 	struct acl_entry *aclEntry = aclEntryHead;
 		
@@ -1070,6 +1253,13 @@ void clearAclList(struct acl_entry *aclEntryHead) {
 	}	
 }
 
+/**
+ * This function ignores all lines until it finds one with a "." 
+ * denoting the end of the ACL.
+ * It is especially useful when an error has been found 
+ * on the command and there is no need to keep parsing 
+ * the ACL
+ */
 void ignoreRestOfAcl() {
 	while (1) {		
 		char *line = getLine();
@@ -1088,6 +1278,13 @@ void ignoreRestOfAcl() {
 	}
 }
 
+/**
+ * Goes through the ACL specified in the input file line by line
+ * until it reaches the "." that means the ACL is done
+ * Returns 
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_INVALID If the command is invalid
+ */
 int parseAclList(struct acl_entry **aclEntryHead, struct acl_entry **aclEntryTail) {
 	char *line;
 	char *username;
@@ -1178,10 +1375,18 @@ int parseAclList(struct acl_entry **aclEntryHead, struct acl_entry **aclEntryTai
 	return C_YES;
 }
 
+/**
+ * Clears the ACL for a file
+ */
 void clearAclForFile(struct file_struct *file) {
 	clearAclList(file->aclHead);
 }
 
+/**
+ * Copies the ACL of one file to another file. 
+ * Especially useful when there is a need of 
+ * inheriting ACL
+ */
 void copyAcl(struct file_struct *dst, struct file_struct *src) {	
 	clearAclForFile(dst);
 
@@ -1218,6 +1423,14 @@ void copyAcl(struct file_struct *dst, struct file_struct *src) {
 
 }
 
+/**
+ * Performs validation on the inputs and then verifies that the 
+ * user and group are allowed to read the file
+ * Returns 
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_NO If the command is valid and the operation is not allowed
+ *	C_INVALID If the command is invalid
+ */
 int executeRead(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
 	struct file_struct *currentFile = file;	
 
@@ -1235,6 +1448,14 @@ int executeRead(struct user_struct *user, struct group_struct *group, struct fil
 	return C_YES;
 }
 
+/**
+ * Performs validation on the inputs and then verifies that the 
+ * user and group are allowed to write to the file
+ * Returns
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_NO If the command is valid and the operation is not allowed
+ *	C_INVALID If the command is invalid
+ */
 int executeWrite(struct user_struct *user, struct group_struct *group, struct file_struct *file) {	
 	struct acl_entry *aclEntry = findAclByFileUserAndGroup(file, user, group);
 	struct file_struct *parentFile = file->parent;
@@ -1252,6 +1473,14 @@ int executeWrite(struct user_struct *user, struct group_struct *group, struct fi
 	return executeRead(user, group, parentFile);
 }
 
+/**
+ * Performs validation of the inputs and then verifies that the 
+ * user and group can perform the acl operation on the file
+ * Returns
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_NO If the command is valid and the operation is not allowed
+ *	C_INVALID If the command is invalid
+ */
 int executeAcl(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
 	int result;
 	struct acl_entry *aclEntryHead;
@@ -1283,6 +1512,14 @@ int executeAcl(struct user_struct *user, struct group_struct *group, struct file
 	return C_YES;
 }
 
+/**
+ * Performs some validation of the inputs and then verifies that the
+ * user and group can perform the create operation
+ * Returns 
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_NO If the command is valid and the operation is not allowed
+ *	C_INVALID If the command is invalid
+ */
 int executeCreate(struct user_struct *user, struct group_struct *group, char *filename) {
 	char *fileLine = filename;
 	char *lastSlash = fileLine;
@@ -1397,6 +1634,15 @@ int executeCreate(struct user_struct *user, struct group_struct *group, char *fi
 	return C_YES;
 }
 
+/**
+ * Performs validation to make sure that the file can be deleted, 
+ * checks the the ACL to make sure that the user and group are 
+ * allowed to delete the file.
+ * Returns 
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_NO If the command is valid and the operation is not allowed
+ *	C_INVALID If the command is invalid
+ */
 int executeDelete(struct user_struct *user, struct group_struct *group, struct file_struct *file) {
 	struct file_struct *parentFile = file->parent;
 	struct file_struct *window = parentFile->children;
@@ -1439,6 +1685,13 @@ int executeDelete(struct user_struct *user, struct group_struct *group, struct f
 	return C_YES;
 }
 
+/**
+ * Performs checks on the input and calls the appropriate command
+ * Returns
+ *	C_YES If the command is valid and the operation is allowed
+ *	C_NO If the command is valid and the operation is not allowed
+ *	C_INVALID If the command is invalid
+ */
 int executeCommand(char *command, char *username, char *groupname, char *filename) {
 	struct user_struct *user = findUserByUsername(username);
 	struct group_struct *group = findGroupByGroupname(groupname);
@@ -1517,6 +1770,10 @@ int executeCommand(char *command, char *username, char *groupname, char *filenam
 	return C_INVALID;
 }
 
+/**
+ * Gets the command, username, groupname and file from the line
+ * and calls a function to execute it
+ */
 int parseCommandLine(char *line) {
 	char command[7];
 	int len = 0;
@@ -1587,6 +1844,13 @@ int parseCommandLine(char *line) {
 	return result;
 }
 
+/**
+ * Gets the command from the file and prints out the result
+ * of that line along with an error message if there was 
+ * an error.
+ * Line is printed in the format
+ * <command number>	<Y/N/X>	<command input>	[error message] 
+ */
 void parseFileOpearationSection(){
 	char *line;	
 	int num = 1;
@@ -1622,6 +1886,9 @@ void parseFileOpearationSection(){
 	}
 }
 
+/**
+ * Main function.
+ */
 int main(int argc, char *argv[]) {
 	initFs();
 	parseUserDefinitionSection();
