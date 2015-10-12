@@ -32,6 +32,10 @@ test:	build
 	./acl_checker < test11.txt
 	@echo "------------"
 	./acl_checker < test12.txt
+	@echo "------------"
+	./acl_checker < test13.txt
+	@echo "------------"
+	./acl_checker < test14.txt
 
 exec: build
 	./acl_checker $(ARG)

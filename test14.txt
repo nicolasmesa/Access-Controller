@@ -1,0 +1,18 @@
+user.group /home/user
+user.columbia
+nicolas.mesa /home/nicolas
+.
+READ nicolas.mesa /home/nicolas
+WRITE nicolas.mesa /home/nicolas
+CREATE nicolas.mesa /home/nicolas/sample
+nicolas.mesa rw
+*.group r
+newuser.newgroup r
+.
+ACL nicolas.mesa /home/nicolas/sample
+nicolas.mesa rw
+*.group r
+*.newgroup -
+otheruser.othergroup rw
+.
+DELETE nicolas.mesa /home/nicolas/sample

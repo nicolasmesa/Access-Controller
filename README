@@ -1,0 +1,138 @@
+Assignment 1 by Nicolas Mesa (nm2805)
+
+This is a program that simulates access control rule evaluations. It reads its input from STDIN, performs some processing and outputs the validity of each command. 
+
+The input is divided into two different parts:
+
+1. User definition section:
+In this section, the users groups and files are created. Files in this assignment are treated as directories, that is, a file can contain 0 or more files. At the beginning, the system will only have three files: "/", "/tmp" and "/home" with the following ACLs:
+"/": *.* r
+"/tmp": *.* rw
+"/home": *.* r
+
+Note that "/tmp" and "/home" are children of file "/".
+
+As it was said before, the user definition section defines the initial configuration of the system. The following is an example of the user definition section:
+
+user.group /home/user
+user.columbia
+nicolas.mesa /home/nicolas
+.
+
+The first line will create a user called "user" and a group called "group". It will add the user "user" to the group "group" and then will create the file "/home/user". This file is created with an ACL of 
+user.group rw
+
+The second line specifies the same user ("user") as before but with a different group. In this case, the group "columbia" is created, the user "user" is added to the "columbia" group and the ACL for "/home/user" is now:
+user.group rw
+user.columbia rw 
+
+The third line is very similar to the first one. In this case, a new user ("nicolas") is cresated and a new group ("mesa") is also created. The user is added to the respective group and the file "/home/nicolas" is created with the following ACL:
+nicolas.mesa rw
+
+The line containing the dot (".") denotes the end of the user definition section. When this point is reached, an additional ACL entry is created for all of the files created levaing the following ACLs as a result:
+"/home/user"
+  user.group rw
+  user.columbia rw
+  *.* r
+
+"/home/nicolas"
+  nicolas.mesa rw
+  *.* r
+
+There is also an implicit "*.* -" at the end of each ACL meaning that everybody else has no permissions on the file.
+
+
+
+2. File operation section:
+This section consists on a series of commands that operate on the files that are already created and create new users, groups or files. The output of each command denotes the validity of said command and if the user specified can perform the operation (assuming the command input is not invalid). The commands are in the following format:
+
+<COMMAND NAME> <username>.<groupname> </path/to/file>
+
+All commands perform some general validation before executing the actual command:
+ * Verify that the command name is valid
+ * Verify that the user exists
+ * Verify that the group exists
+ * Verify that the user belongs to the group
+ * Verify the file
+
+
+The available commands are:
+
+READ
+After the general verification, this command verifies that the file exists. Then it will make sure that the user and group are allowed to read each component of the file path.
+
+Sample:
+READ nicolas.mesa /home/nicolas 
+
+
+WRITE
+After the general verification, this command verifies that the file exists. Then it will make sure that the user and group have write permissions on the file. After that, it will make sure that the user can read the parent directory by checking each component in the file path.
+
+Sample
+WRITE nicolas.mesa /home/nicolas
+
+
+CREATE
+After the general verification, this command verifies that the file does not exist. It also makes sure that the parent of the file to be create does exist. Then it will make sure that the user and group have write permissions on the parent directory of the file to be created (involving checking if the whole path to the parent directory is readable). The the ACL is read and appended to the created file. If a user or group don't exist, they are created and the user is inserted into the group.
+
+Sample
+CREATE nicolas.mesa /home/nicolas/sample
+nicolas.mesa rw
+*.group r
+newuser.newgroup r
+.
+
+ACL
+After the general verification, this command verifies that the file exists. The it will make sure that the user and group have write permissions on the file  (involving checking if the whole path to the parent directory is readable). After this, the ACL is read overwriting the previous ACL of the file. If a user or a group don't exist, they are created and the user is inserted into the group.
+
+Sample
+ACL nicolas.mesa /home/nicolas/sample
+nicolas.mesa rw
+*.group r
+*.newgroup -
+otheruser.othergroup rw
+.
+
+
+DELETE
+After the general verification, this command verifies that the file exists. It will also make sure that the file doesn't have children. Then it will make sure to have write permissions on the parent directory (involving checking if the whole path to the parent directory is readable).
+
+Sample
+DELETE nicolas.mesa /home/nicolas/sample
+
+
+Whole sample (input):
+
+user.group /home/user
+user.columbia
+nicolas.mesa /home/nicolas
+.
+READ nicolas.mesa /home/nicolas
+WRITE nicolas.mesa /home/nicolas
+CREATE nicolas.mesa /home/nicolas/sample
+nicolas.mesa rw
+*.group r
+newuser.newgroup r
+.
+ACL nicolas.mesa /home/nicolas/sample
+nicolas.mesa rw
+*.group r
+*.newgroup -
+otheruser.othergroup rw
+.
+DELETE nicolas.mesa /home/nicolas/sample
+
+
+Whole sample (output):
+
+1	Y
+2	Y
+3	Y
+1	Y	READ nicolas.mesa /home/nicolas
+2	Y	WRITE nicolas.mesa /home/nicolas
+3	Y	CREATE nicolas.mesa /home/nicolas/sample
+4	Y	ACL nicolas.mesa /home/nicolas/sample
+5	Y	DELETE nicolas.mesa /home/nicolas/sample
+
+
+To execute the command just save the input into a file such as "file.txt" and then call the command "make exec < file.txt".

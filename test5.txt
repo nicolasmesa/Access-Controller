@@ -30,3 +30,4 @@ user.group rw
 *.mesa w
 .
 WRITE nicolas.mesa /home/nicolas/new
+READ nicolas.mesa /
