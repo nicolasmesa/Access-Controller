@@ -89,6 +89,7 @@ void dbg(char *msg) {
  */
 void setError(char *msg) {
   if (error.read == 0) {
+  	printf("msg %s\n", error.message);
     dbg("Warning. Setting error without reading prior message");
   }
 
@@ -238,6 +239,7 @@ struct file_struct *createFile(char *cmpName, struct file_struct *parent) {
 int validateFilePath(char *path) {
   int last = 0;
   int cmpLength = 0;
+  char *pathStart = path;
 
   if (!path) {
     setError("Undefined file path");
@@ -278,7 +280,7 @@ int validateFilePath(char *path) {
     path++;
   }
 
-  if (cmpLength == 0) {
+  if (cmpLength == 0 && strlen(pathStart) > 1) {
     setError("Can't end file path in a /");
     return 0;
   }
