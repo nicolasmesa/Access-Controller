@@ -90,7 +90,7 @@ void dbg(char *msg) {
  */
 void setError(char *msg) {
   if (error.read == 0) {
-  	printf("msg %s\n", error.message);
+    printf("msg %s\n", error.message);
     dbg("Warning. Setting error without reading prior message");
   }
 
