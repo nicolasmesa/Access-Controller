@@ -1,0 +1,7 @@
+1   Y
+2   Y
+3   N	Capital letters
+4   Y
+5   Y
+1   Y   READ smb.columbia /home
+2   Y   CREATE smb.faculty /home/smb/foo

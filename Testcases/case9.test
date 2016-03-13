@@ -1,0 +1,17 @@
+smb.faculty /home/smb
+smb.columbia
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+.
+CREATE smb.columbia /home/smb/fooi
+smb.* rw
+.
+CREATE smb.columbia /home/smb/fooi/fooj
+.
+ACL smb.columbia /home/smb/fooi
+smb.* r
+.
+DELETE smb.columbia /home/smb/fooi/fooj
+DELETE smb.columbia /home/smb/fooi/fooj
+DELETE smb.columbia /home/smb/fooi

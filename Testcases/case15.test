@@ -1,0 +1,13 @@
+smb.faculty /home/smb
+smb.columbia
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+.
+ACL smb.columbia /home/smb
+*.columbia r
+*.faculty r
+.
+WRITE smb.columbia /home/smb
+WRITE smb.faculty /home/smb
+WRITE sal.faculty /home/smb

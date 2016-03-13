@@ -1,0 +1,8 @@
+smb.faculty /home/smb
+aman.ta /home/smb/foo
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+.
+READ suphannee.ta /home/smb
+WRITE suphannee.ta /home/smb/..

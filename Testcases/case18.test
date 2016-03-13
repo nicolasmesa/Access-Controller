@@ -1,0 +1,8 @@
+smb.faculty /home/smb
+smb.columbia
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+.
+WRITE smb.columbia /home/smb/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxX
+READ smb.columbia /home/smb

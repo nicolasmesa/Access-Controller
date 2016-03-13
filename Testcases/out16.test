@@ -1,0 +1,7 @@
+1   Y
+2   Y
+3   Y
+4   Y
+1   X   custom_error_message
+2   Y   WRITE smb.columbia /home/smb/foo
+

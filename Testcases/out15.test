@@ -1,0 +1,9 @@
+1   Y
+2   Y
+3   Y
+4   Y
+5   Y
+1   Y   ACL smb.columbia /home/smb
+2   N   WRITE smb.columbia /home/smb    error
+3   N   WRITE smb.faculty /home/smb error
+4   N   WRITE sal.faculty /home/smb error

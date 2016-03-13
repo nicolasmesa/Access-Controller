@@ -1,0 +1,12 @@
+smb.faculty /home/smb
+smb.columbia
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+.
+CREATE smb.columbia /home/smb/foo
+smb.* r
+.
+ACL smb.columbia /home/smb/foo
+smb.* rw
+.

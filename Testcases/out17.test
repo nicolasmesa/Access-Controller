@@ -1,0 +1,11 @@
+1   Y
+2   Y
+3   Y
+4   Y
+5   Y
+1   Y   CREATE smb.faculty /home/smb/foo
+2   Y   CREATE smb.faculty /home/smb/foo/bar
+3   Y   READ aman.ta /home/smb/foo/bar
+4   N   WRITE aman.ta /home/smb/foo/bar
+5   X|N   CREATE aman.ta /home/smb/foo/bar
+6   N   DELETE aman.ta /home/smb/foo/bar

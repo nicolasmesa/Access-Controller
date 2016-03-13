@@ -1,0 +1,17 @@
+smb.faculty /home/smb
+smb.columbia
+sal.faculty /home/sal
+bollinger.columbia /home/bollinger
+suphannee.ta /home/suphannee
+.
+CREATE smb.columbia /home/smb/foo
+smb.* rw
+.
+WRITE smb.faculty /home/smb/foo
+READ smb.columbia /home/smb/foo
+ACL smb.faculty /home/smb/foo
+smb.* r
+*.faculty w
+.
+WRITE smb.faculty /home/smb/foo
+WRITE sal.faculty /home/smb/foo

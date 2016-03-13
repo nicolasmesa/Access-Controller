@@ -1,0 +1,7 @@
+1   Y
+2   Y
+3   Y
+4   Y
+5   Y
+1   N   APPEND smb.columbia /home Wrong command	
+2   Y   CREATE smb.faculty /home/smb/foo

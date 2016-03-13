@@ -1,0 +1,7 @@
+1   Y
+2   Y
+3   Y
+4   Y
+5   Y
+1   Y   READ suphannee.ta /home/smb
+2   N   WRITE suphannee.ta /home/smb/.. error_message

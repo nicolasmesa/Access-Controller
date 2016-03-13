@@ -1,0 +1,11 @@
+1   Y
+2   Y
+3   Y
+4   Y
+5   Y
+1   Y   CREATE smb.columbia /home/smb/foo
+2   Y   WRITE smb.faculty /home/smb/foo
+3   Y   READ smb.columbia /home/smb/foo
+4   Y   ACL smb.faculty /home/smb/foo
+5   N   WRITE smb.faculty /home/smb/foo
+6   N   WRITE sal.faculty /home/smb/foo

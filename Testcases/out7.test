@@ -1,0 +1,7 @@
+1   Y
+2   Y
+3   Y
+4   Y
+5   Y
+1   Y   CREATE smb.columbia /home/smb/foo1
+2   N   CREATE smb.columbia /home/smb/foo1/foo2
